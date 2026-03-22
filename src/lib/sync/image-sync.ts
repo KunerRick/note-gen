@@ -40,7 +40,6 @@ export function extractLocalImagePaths(content: string): string[] {
   const imagePaths: string[] = []
   
   // 正则匹配 Markdown 图片语法: ![alt](path)
-  // 支持相对路径和绝对路径
   const imageRegex = /!\[([^\]]*)\]\(([^)]+)\)/g
   
   let match
@@ -57,21 +56,20 @@ export function extractLocalImagePaths(content: string): string[] {
       continue
     }
     
-    // 移除查询参数（如果有）
+    // 移除查询参数
     const cleanPath = imagePath.split('?')[0]
     
-    // 跳过空路径
     if (!cleanPath) continue
     
     // 标准化路径分隔符
     const normalizedPath = cleanPath.replace(/\\/g, '/')
     
-    // 去重
     if (!imagePaths.includes(normalizedPath)) {
       imagePaths.push(normalizedPath)
     }
   }
   
+  console.log(`[ImageSync] Extracted ${imagePaths.length} image paths from content`)
   return imagePaths
 }
 

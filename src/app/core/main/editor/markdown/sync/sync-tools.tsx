@@ -7,6 +7,7 @@ import { HistorySheet } from './history-sheet'
 import { BatchSyncSheet } from './batch-sync-sheet'
 import { useRouter } from 'next/navigation'
 import { isSyncConfigured } from '@/lib/sync/sync-manager'
+import { isMobileDevice } from '@/lib/check'
 import { useEffect, useState } from 'react'
 
 interface SyncToolsProps {
@@ -23,7 +24,8 @@ export function SyncTools({ editor }: SyncToolsProps) {
   }, [])
 
   const handleConfigureSync = () => {
-    router.push('/core/setting/sync')
+    const syncPath = isMobileDevice() ? '/mobile/setting/pages/sync' : '/core/setting/sync'
+    router.push(syncPath)
   }
 
   if (configured) {

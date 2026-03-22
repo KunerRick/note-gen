@@ -121,7 +121,7 @@ export function BatchSyncButton({ variant = 'outline', size = 'default', showLab
       </Button>
 
       <Dialog open={isOpen} onOpenChange={setIsOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-lg">
           <DialogHeader>
             <DialogTitle>全量同步</DialogTitle>
             <DialogDescription>
@@ -208,16 +208,16 @@ export function BatchSyncButton({ variant = 'outline', size = 'default', showLab
             )}
           </div>
 
-          <DialogFooter>
+          <div className="flex justify-end gap-2 mt-4">
             {!result && (
               <>
-                <Button variant="outline" onClick={() => setIsOpen(false)} disabled={isSyncing}>
+                <Button variant="outline" onClick={() => setIsOpen(false)} disabled={isSyncing} className="flex-1">
                   取消
                 </Button>
-                <Button onClick={handleSync} disabled={isSyncing || (stats?.pendingUpload ?? 0) === 0}>
+                <Button onClick={handleSync} disabled={isSyncing || (stats?.pendingUpload ?? 0) === 0} className="flex-1 mt-0">
                   {isSyncing ? (
                     <>
-                      <Loader2 className="size-4 animate-spin mr-2" />
+                      <Loader2 className="size-4 animate-spin" />
                       同步中...
                     </>
                   ) : (
@@ -227,11 +227,11 @@ export function BatchSyncButton({ variant = 'outline', size = 'default', showLab
               </>
             )}
             {result && (
-              <Button onClick={() => setIsOpen(false)}>
+              <Button onClick={() => setIsOpen(false)} className="flex-1">
                 关闭
               </Button>
             )}
-          </DialogFooter>
+          </div>
         </DialogContent>
       </Dialog>
     </>

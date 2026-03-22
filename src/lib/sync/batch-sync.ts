@@ -1,5 +1,5 @@
 import { Store } from '@tauri-apps/plugin-store'
-import { readDir, readTextFile, DirEntry } from '@tauri-apps/plugin-fs'
+import { readDir, readTextFile, DirEntry, BaseDirectory } from '@tauri-apps/plugin-fs'
 import { getWorkspacePath, getFilePathOptions } from '@/lib/workspace'
 import { getSyncRepoName } from './repo-utils'
 import { getRemoteFileInfo, compareFileVersions, setLocalRecordedSha } from './auto-sync'
@@ -79,7 +79,7 @@ async function getWebDAVConfig(): Promise<WebDAVConfig | null> {
   return null
 }
 
-async function listFilesRecursively(dirPath: string, basePath: string, useCustom: boolean): Promise<string[]> {
+async function listFilesRecursively(dirPath: string, useCustom: boolean): Promise<string[]> {
   const files: string[] = []
   
   const processDir = async (currentDir: string, relativeDir: string) => {
@@ -88,7 +88,7 @@ async function listFilesRecursively(dirPath: string, basePath: string, useCustom
       if (useCustom) {
         entries = await readDir(currentDir)
       } else {
-        entries = await readDir(currentDir, { baseDir: basePath as any })
+        entries = await readDir(currentDir, { baseDir: BaseDirectory.AppData })
       }
       
       for (const entry of entries) {
@@ -117,9 +117,9 @@ export async function scanWorkspace(): Promise<SyncItem[]> {
   const items: SyncItem[] = []
   const workspace = await getWorkspacePath()
   
+  const dirPath = workspace.isCustom ? workspace.path : 'article'
   const files = await listFilesRecursively(
-    workspace.path,
-    workspace.isCustom ? workspace.path : 'article',
+    dirPath,
     workspace.isCustom
   )
   
@@ -394,9 +394,9 @@ async function pullSingleFile(path: string): Promise<void> {
 
 export async function scanWorkspaceImages(): Promise<string[]> {
   const workspace = await getWorkspacePath()
+  const dirPath = workspace.isCustom ? workspace.path : 'article'
   const allFiles = await listFilesRecursively(
-    workspace.path,
-    workspace.isCustom ? workspace.path : 'article',
+    dirPath,
     workspace.isCustom
   )
   

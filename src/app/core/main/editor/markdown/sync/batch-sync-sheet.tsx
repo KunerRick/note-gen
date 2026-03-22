@@ -116,7 +116,7 @@ export function BatchSyncSheet({ className, trigger }: BatchSyncSheetProps) {
       <SheetTrigger asChild>
         {trigger || defaultTrigger}
       </SheetTrigger>
-      <SheetContent side="bottom" className="h-[70vh]">
+      <SheetContent side="bottom" className="h-[70vh]  flex flex-col">
         <SheetHeader>
           <SheetTitle>全量同步</SheetTitle>
           <SheetDescription>
@@ -132,28 +132,28 @@ export function BatchSyncSheet({ className, trigger }: BatchSyncSheetProps) {
                   <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
                     <Upload className="size-5 text-blue-500" />
                     <div>
-                      <div className="text-sm font-medium">{stats.pendingUpload}</div>
+                      <div className="text-blue-500 text-sm font-medium">{stats.pendingUpload}</div>
                       <div className="text-xs text-gray-500">待上传</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
                     <Download className="size-5 text-green-500" />
                     <div>
-                      <div className="text-sm font-medium">{stats.pendingDownload}</div>
+                      <div className="text-sm font-medium text-green-500">{stats.pendingDownload}</div>
                       <div className="text-xs text-gray-500">待下载</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 p-3 bg-purple-50 rounded-lg">
                     <Image className="size-5 text-purple-500" />
                     <div>
-                      <div className="text-sm font-medium">{stats.totalImages}</div>
+                      <div className="text-sm font-medium text-purple-500" >{stats.totalImages}</div>
                       <div className="text-xs text-gray-500">图片</div>
                     </div>
                   </div>
                   <div className="flex items-center gap-2 p-3 bg-orange-50 rounded-lg">
                     <AlertCircle className="size-5 text-orange-500" />
                     <div>
-                      <div className="text-sm font-medium">{stats.conflicts}</div>
+                      <div className="text-sm font-medium text-orange-500">{stats.conflicts}</div>
                       <div className="text-xs text-gray-500">冲突</div>
                     </div>
                   </div>

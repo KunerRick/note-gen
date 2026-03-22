@@ -453,24 +453,23 @@ class SyncPushQueue {
             await setLocalRecordedSha(path, uploadedSha)
           }
           
-          // 推送文档成功后，同步关联的图片（异步执行，不阻塞）
+          // 推送文档成功后，同步关联的图片
           const isMarkdown = path.endsWith('.md') || path.endsWith('.markdown')
           if (isMarkdown) {
-            // 异步同步图片，不等待完成
-            syncImagesForDocument(path, content).then(result => {
-              if (result.totalImages > 0) {
-                console.log(`[SyncPushQueue] Synced ${result.successCount}/${result.totalImages} images for ${path}`)
-                // 发送图片同步完成事件
-                emitter.emit('sync-images-completed', {
-                  path,
-                  totalImages: result.totalImages,
-                  successCount: result.successCount,
-                  failedCount: result.failedCount
-                })
-              }
-            }).catch(error => {
-              console.error(`[SyncPushQueue] Failed to sync images for ${path}:`, error)
-            })
+            console.log(`[SyncPushQueue] Starting image sync for ${path}`)
+            try {
+              const imageResult = await syncImagesForDocument(path, content)
+              console.log(`[SyncPushQueue] Image sync result: ${imageResult.totalImages} images found, ${imageResult.successCount} synced, ${imageResult.failedCount} failed`)
+              // 发送图片同步完成事件
+              emitter.emit('sync-images-completed', {
+                path,
+                totalImages: imageResult.totalImages,
+                successCount: imageResult.successCount,
+                failedCount: imageResult.failedCount
+              })
+            } catch (error) {
+              console.error(`[SyncPushQueue] Image sync error for ${path}:`, error)
+            }
           }
           
           emitter.emit('sync-push-completed', { path, success: true, sha: uploadedSha })
