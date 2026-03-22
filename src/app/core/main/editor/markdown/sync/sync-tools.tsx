@@ -4,6 +4,7 @@ import { useTranslations } from 'next-intl'
 import { SyncButton } from './sync-button'
 import { PullButton } from './pull-button'
 import { HistorySheet } from './history-sheet'
+import { BatchSyncSheet } from './batch-sync-sheet'
 import { useRouter } from 'next/navigation'
 import { isSyncConfigured } from '@/lib/sync/sync-manager'
 import { useEffect, useState } from 'react'
@@ -29,6 +30,7 @@ export function SyncTools({ editor }: SyncToolsProps) {
     return (
       <div className="flex items-center gap-1">
         <HistorySheet editor={editor} />
+        <BatchSyncSheet />
         <SyncButton />
         <PullButton editor={editor} />
       </div>

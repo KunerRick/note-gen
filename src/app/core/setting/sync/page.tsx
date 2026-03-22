@@ -7,6 +7,7 @@ import { GitlabSync } from "./gitlab-sync";
 import { GiteaSync } from "./gitea-sync";
 import { S3Sync } from "./s3-sync";
 import { WebDAVSync } from "./webdav-sync";
+import { BatchSyncButton } from "./components/batch-sync-button";
 import { SettingType } from '../components/setting-base';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, RefreshCcw } from "lucide-react"
@@ -135,6 +136,11 @@ export default function SyncPage() {
 
       {/* 同步平台内容 */}
       {renderSyncContent()}
+
+      {/* 全量同步按钮 */}
+      <div className="mt-4">
+        <BatchSyncButton variant="default" size="lg" showLabel />
+      </div>
 
       {/* 全局自动同步设置 */}
       <div className="mt-4">
