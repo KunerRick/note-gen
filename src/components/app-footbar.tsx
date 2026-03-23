@@ -234,7 +234,7 @@ export function AppFootbar() {
       icon: SquarePen,
     },
     {
-      title: t('navigation.setting'),
+      title: t('navigation.me'),
       url: "/mobile/setting",
       icon: Settings,
     },

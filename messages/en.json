@@ -2005,6 +2005,7 @@
     "record": "Record",
     "quickRecord": "Quick Record",
     "write": "Write",
+    "me": "My",
     "search": "Search",
     "githubImageHosting": "Github Image Hosting",
     "login": "Login",
@@ -2509,6 +2510,48 @@
     }
   },
   "mobile": {
+    "me": {
+      "profile": {
+        "deviceName": "Sync Platform",
+        "deviceSubtitle": "Sync your records and settings",
+        "syncPlatform": "Sync Platform",
+        "gitSubtitle": "Connected to {provider} to sync your records and settings",
+        "storageSubtitle": "Currently using {provider} to sync your records and settings",
+        "unconfiguredSubtitle": "Sync is not configured yet. Your data is currently stored locally only",
+        "streak": "Active for {count} days in a row"
+      },
+      "activity": {
+        "tip": "Tap any day in the heatmap to open its activity timeline.",
+        "range": "Last {count} weeks",
+        "rangePlaceholder": "Last 16 weeks",
+        "drawerEmpty": "Choose a day to inspect its activity details.",
+        "drawerSummary": "{total} activities that day, including {record} records, {writing} writing events, and {chat} chats."
+      },
+      "sync": {
+        "title": "Sync",
+        "configured": "Connected",
+        "unconfigured": "Not configured",
+        "localOnly": "Local only"
+      },
+      "stats": {
+        "weekly": "This Week",
+        "weeklyHint": "Total activities this week",
+        "streak": "Current Streak",
+        "streakHint": "Consecutive active days"
+      },
+      "status": {
+        "title": "Current Setup",
+        "sync": "Backup Method",
+        "model": "Default Model",
+        "configured": "Connected",
+        "unconfigured": "Not configured",
+        "modelFallback": "No default model"
+      },
+      "settings": {
+        "title": "Settings",
+        "description": "Open each feature setting directly from here."
+      }
+    },
     "chat": {
       "drawer": {
         "settings": {

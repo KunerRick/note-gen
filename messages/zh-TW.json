@@ -1917,6 +1917,7 @@
     "record": "記錄",
     "quickRecord": "快捷記錄",
     "write": "寫作",
+    "me": "我的",
     "search": "搜索",
     "githubImageHosting": "Github 圖床",
     "login": "登錄",
@@ -2368,6 +2369,40 @@
     }
   },
   "mobile": {
+    "me": {
+      "profile": {
+        "deviceName": "同步平台",
+        "deviceSubtitle": "同步你的記錄與設定",
+        "syncPlatform": "同步平台",
+        "gitSubtitle": "已連接 {provider}，可同步你的記錄與設定",
+        "storageSubtitle": "目前透過 {provider} 同步你的記錄與設定",
+        "unconfiguredSubtitle": "尚未設定同步，目前資料僅保存在本地",
+        "streak": "已連續活躍 {count} 天"
+      },
+      "activity": {
+        "tip": "點擊熱力圖中的日期，查看當天的活動時間軸。",
+        "range": "最近 {count} 週",
+        "rangePlaceholder": "最近 16 週",
+        "drawerEmpty": "選擇一個日期查看當天的活動詳情。",
+        "drawerSummary": "當天共 {total} 條活動，含 {record} 條記錄、{writing} 條寫作、{chat} 條對話。"
+      },
+      "sync": {
+        "title": "同步",
+        "configured": "已連線",
+        "unconfigured": "未設定",
+        "localOnly": "僅本地"
+      },
+      "stats": {
+        "weekly": "本週活躍",
+        "weeklyHint": "本週累計活動次數",
+        "streak": "連續活躍",
+        "streakHint": "連續活躍天數"
+      },
+      "settings": {
+        "title": "設定",
+        "description": "直接在這裡進入各項功能設定。"
+      }
+    },
     "chat": {
       "drawer": {
         "settings": {

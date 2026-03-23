@@ -5,6 +5,8 @@ import baseConfig from '@/app/core/setting/config'
 import { useTranslations } from 'next-intl'
 import { ChevronRight } from "lucide-react";
 
+const MOBILE_ME_SCROLL_KEY = 'mobile-me-scroll-top'
+
 export function SettingTab() {
   const router = useRouter()
   const t = useTranslations('settings')
@@ -24,6 +26,10 @@ export function SettingTab() {
   })
 
   function handleNavigation(anchor: string) {
+    const mePage = document.getElementById('mobile-me')
+    if (mePage) {
+      window.sessionStorage.setItem(MOBILE_ME_SCROLL_KEY, String(mePage.scrollTop))
+    }
     router.push(`/mobile/setting/pages/${anchor}`)
   }
 

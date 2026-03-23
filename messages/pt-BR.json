@@ -1959,6 +1959,7 @@
     "record": "Registro",
     "quickRecord": "Registro Rápido",
     "write": "Escrever",
+    "me": "Meu",
     "search": "Pesquisar",
     "githubImageHosting": "Hospedagem de Imagens Github",
     "login": "Entrar",
@@ -2449,6 +2450,40 @@
     }
   },
   "mobile": {
+    "me": {
+      "profile": {
+        "deviceName": "Plataforma de Sincronização",
+        "deviceSubtitle": "Sincronize seus registros e configurações",
+        "syncPlatform": "Plataforma de Sincronização",
+        "gitSubtitle": "Conectado ao {provider} para sincronizar seus registros e configurações",
+        "storageSubtitle": "No momento usando {provider} para sincronizar seus registros e configurações",
+        "unconfiguredSubtitle": "A sincronização ainda não foi configurada. Seus dados estão salvos apenas localmente",
+        "streak": "Ativo por {count} dias seguidos"
+      },
+      "activity": {
+        "tip": "Toque em um dia do mapa de calor para abrir a linha do tempo daquele dia.",
+        "range": "Últimas {count} semanas",
+        "rangePlaceholder": "Últimas 16 semanas",
+        "drawerEmpty": "Escolha um dia para ver os detalhes da atividade.",
+        "drawerSummary": "Houve {total} atividades nesse dia, incluindo {record} registros, {writing} escritas e {chat} conversas."
+      },
+      "sync": {
+        "title": "Sincronização",
+        "configured": "Conectado",
+        "unconfigured": "Não configurado",
+        "localOnly": "Apenas local"
+      },
+      "stats": {
+        "weekly": "Esta Semana",
+        "weeklyHint": "Total de atividades nesta semana",
+        "streak": "Sequência Atual",
+        "streakHint": "Dias consecutivos com atividade"
+      },
+      "settings": {
+        "title": "Configurações",
+        "description": "Abra diretamente daqui as configurações de cada recurso."
+      }
+    },
     "chat": {
       "drawer": {
         "settings": {

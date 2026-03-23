@@ -8,6 +8,7 @@ import { getGiteaApiBaseUrl } from './gitea'
 import { s3Upload } from './s3'
 import { webdavUpload } from './webdav'
 import { S3Config, WebDAVConfig } from '@/types/sync'
+import { buildGithubTreeEntries, buildGitlabCommitActions } from './folder-sync-payload'
 
 export interface FolderSyncResult {
   success: boolean
@@ -202,12 +203,7 @@ export class FolderSync {
     // 构建 tree
     // 注意：GitHub API 不允许同时提供 sha 和 content
     // 只提供 content，让 GitHub 自动处理（新文件创建 blob，已存在文件也会创建新的 blob）
-    const tree = files.map((file) => ({
-      path: file.path,
-      mode: '100644',
-      type: 'blob',
-      content: Buffer.from(file.content).toString('base64'),
-    }))
+    const tree = buildGithubTreeEntries(files)
 
     const headers = new Headers()
     headers.append('Authorization', `Bearer ${accessToken}`)
@@ -474,12 +470,7 @@ export class FolderSync {
     headers.append('Content-Type', 'application/json;charset=iso-8859-1')
 
     // 构建 actions 数组
-    const actions = files.map(file => ({
-      action: file.sha ? 'update' : 'create',
-      file_path: file.path,
-      content: Buffer.from(file.content).toString('base64'),
-      ...(file.sha && { sha: file.sha })
-    }))
+    const actions = buildGitlabCommitActions(files)
 
     const url = `${gitlabUrl}/api/v4/projects/${encodeURIComponent(gitlabProjectId)}/repository/commits`
 

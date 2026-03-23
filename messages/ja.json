@@ -1907,6 +1907,7 @@
     "record": "記録",
     "quickRecord": "クイック記録",
     "write": "執筆",
+    "me": "マイ",
     "search": "検索",
     "githubImageHosting": "Github 画像ホスティング",
     "login": "ログイン",
@@ -2501,6 +2502,40 @@
     }
   },
   "mobile": {
+    "me": {
+      "profile": {
+        "deviceName": "同期プラットフォーム",
+        "deviceSubtitle": "記録と設定を同期",
+        "syncPlatform": "同期プラットフォーム",
+        "gitSubtitle": "{provider} に接続して記録と設定を同期しています",
+        "storageSubtitle": "現在は {provider} を使って記録と設定を同期しています",
+        "unconfiguredSubtitle": "同期はまだ設定されていません。現在のデータはローカルのみに保存されています",
+        "streak": "{count}日連続でアクティブ"
+      },
+      "activity": {
+        "tip": "ヒートマップの日付をタップすると、その日のタイムラインを表示します。",
+        "range": "直近 {count} 週間",
+        "rangePlaceholder": "直近 16 週間",
+        "drawerEmpty": "日付を選択すると、その日の活動詳細を確認できます。",
+        "drawerSummary": "この日は合計 {total} 件の活動があり、記録 {record} 件、執筆 {writing} 件、対話 {chat} 件です。"
+      },
+      "sync": {
+        "title": "同期",
+        "configured": "接続済み",
+        "unconfigured": "未設定",
+        "localOnly": "ローカルのみ"
+      },
+      "stats": {
+        "weekly": "今週の活動",
+        "weeklyHint": "今週の累計活動回数",
+        "streak": "連続日数",
+        "streakHint": "連続して活動した日数"
+      },
+      "settings": {
+        "title": "設定",
+        "description": "ここから各機能の設定画面へ直接移動できます。"
+      }
+    },
     "chat": {
       "drawer": {
         "settings": {

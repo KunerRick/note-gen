@@ -327,7 +327,7 @@ export function MobileRecordStream() {
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       {!trashState && (
         <div className="sticky top-0 z-10 border-b bg-background px-3 pb-2 pt-2">
           <div className="flex items-center gap-2 overflow-x-auto">
@@ -413,7 +413,7 @@ export function MobileRecordStream() {
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto px-3 py-2">
+      <div className="flex-1 min-h-0 overflow-y-auto px-3 py-2">
         {!trashState && queues.length > 0 && (
           <div className="mb-3 space-y-2">
             {queues.map((queue) => (

@@ -1,10 +1,10 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { BaseDirectory, exists, mkdir, remove, rename as fsRename, stat, writeTextFile } from '@tauri-apps/plugin-fs'
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { useTranslations } from 'next-intl'
-import { ChevronLeft, FilePlus, FileText, FolderPlus, Menu, Pencil, Search, Trash2, Unplug } from 'lucide-react'
+import { ChevronLeft, FilePlus, FileText, FolderPlus, Menu, Pencil, RefreshCw, Search, Trash2, Unplug } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -45,6 +45,7 @@ export function WritingHeader() {
     fileTree,
     fileTreeLoading,
     loadFileTree,
+    loadRemoteSyncFiles,
     loadCollapsibleFiles,
     loadFolderRemoteFiles,
     setCollapsibleList,
@@ -54,7 +55,9 @@ export function WritingHeader() {
   const [searchQuery, setSearchQuery] = useState('')
   const [currentDir, setCurrentDir] = useState('')
   const [folderLoading, setFolderLoading] = useState(false)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [entryMetaMap, setEntryMetaMap] = useState<Record<string, { modifiedAt?: string; size?: number }>>({})
+  const hasInitializedDrawerRef = useRef(false)
 
   const [createType, setCreateType] = useState<'file' | 'folder' | null>(null)
   const [createName, setCreateName] = useState('')
@@ -221,18 +224,42 @@ export function WritingHeader() {
     return modifiedLabel ? `${folderSummary} · ${modifiedLabel}` : folderSummary
   }, [entryMetaMap, formatDateTime, formatSize, tMobile])
 
-  const isBrowserLoading = fileTreeLoading || folderLoading || !!currentFolderNode?.loading
+  const isBrowserLoading = fileTreeLoading || folderLoading || isRefreshing || !!currentFolderNode?.loading
 
   const refreshTree = useCallback(async (dir: string) => {
-    await loadFileTree()
-    if (dir) {
-      await setCollapsibleList(dir, true)
-      await loadCollapsibleFiles(dir)
+    setIsRefreshing(true)
+    try {
+      const parts = dir.split('/').filter(Boolean)
+      const pathsToExpand = parts.map((_, index) => parts.slice(0, index + 1).join('/'))
+
+      for (const path of pathsToExpand) {
+        await setCollapsibleList(path, true)
+      }
+
+      await loadFileTree({ skipRemoteSync: true })
+      await loadRemoteSyncFiles()
+
+      if (!dir) {
+        return
+      }
+
+      for (const path of pathsToExpand) {
+        await loadCollapsibleFiles(path)
+        await loadFolderRemoteFiles(path)
+      }
+    } finally {
+      setIsRefreshing(false)
     }
-  }, [loadFileTree, loadCollapsibleFiles, setCollapsibleList])
+  }, [loadFileTree, loadRemoteSyncFiles, loadCollapsibleFiles, loadFolderRemoteFiles, setCollapsibleList])
 
   useEffect(() => {
-    if (!drawerOpen) return
+    if (!drawerOpen) {
+      hasInitializedDrawerRef.current = false
+      return
+    }
+
+    if (hasInitializedDrawerRef.current) return
+    hasInitializedDrawerRef.current = true
 
     const initialDir = parentPath(normalizedActivePath)
     setCurrentDir(initialDir)
@@ -551,6 +578,17 @@ export function WritingHeader() {
                   className="h-9 pl-8"
                 />
               </div>
+              <Button
+                variant="outline"
+                size="icon"
+                className="h-9 w-9 shrink-0"
+                onClick={() => refreshTree(currentDir)}
+                title={tToolbar('refresh')}
+                aria-label={tToolbar('refresh')}
+                disabled={isBrowserLoading}
+              >
+                <RefreshCw className={`size-4 ${isBrowserLoading ? 'animate-spin' : ''}`} />
+              </Button>
               <Button
                 variant="outline"
                 size="icon"

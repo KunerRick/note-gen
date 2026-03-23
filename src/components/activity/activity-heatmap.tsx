@@ -9,6 +9,7 @@ interface ActivityHeatmapProps {
   selectedDay?: string
   onSelectDay: (day: ActivityDaySummary) => void
   compact?: boolean
+  adaptive?: boolean
   labels: {
     dayCount: string
     emptyDay: string
@@ -36,14 +37,15 @@ export function ActivityHeatmap({
   selectedDay,
   onSelectDay,
   compact = false,
+  adaptive = false,
   labels,
 }: ActivityHeatmapProps) {
   return (
     <TooltipProvider>
       <div className="w-full overflow-visible px-1 py-1">
-        <div className={cn('inline-flex gap-1.5', compact && 'gap-1')}>
+        <div className={cn(adaptive ? 'grid w-full grid-flow-col auto-cols-fr gap-1' : 'inline-flex gap-1.5', compact && !adaptive && 'gap-1')}>
           {weeks.map((week, weekIndex) => (
-            <div key={weekIndex} className={cn('flex flex-col gap-1.5', compact && 'gap-1')}>
+            <div key={weekIndex} className={cn(adaptive ? 'grid grid-rows-7 gap-1' : 'flex flex-col gap-1.5', compact && !adaptive && 'gap-1')}>
               {week.days.map((day) => {
                 const level = getIntensityLevel(day.totalCount)
                 const isSelected = selectedDay === day.day
@@ -58,7 +60,11 @@ export function ActivityHeatmap({
                         type="button"
                         onClick={() => onSelectDay(day)}
                         className={cn(
-                          compact ? 'h-3 w-3 rounded-[3px] border border-black/5 transition-colors' : 'h-4 w-4 rounded-[4px] border border-black/5 transition-colors',
+                          adaptive
+                            ? 'aspect-square w-full rounded-[4px] border border-black/5 transition-colors'
+                            : compact
+                              ? 'h-3 w-3 rounded-[3px] border border-black/5 transition-colors'
+                              : 'h-4 w-4 rounded-[4px] border border-black/5 transition-colors',
                           LEVEL_CLASSES[level],
                           isSelected && (compact
                             ? 'ring-2 ring-primary ring-offset-1 ring-offset-background'

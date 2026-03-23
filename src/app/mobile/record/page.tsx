@@ -4,7 +4,7 @@ import { MobileRecordStream } from './mobile-record-stream'
 
 export default function Record() {
   return (
-    <div id="mobile-record" className="flex flex-col h-full w-full bg-background">
+    <div id="mobile-record" className="flex h-full min-h-0 w-full flex-col bg-background">
       <MobileMarkHeader />
       <MobileRecordStream />
     </div>

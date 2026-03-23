@@ -13,13 +13,13 @@ export default function RootLayout({
   const router = useRouter()
   return (
     <SwipeBack>
-      <div className="flex flex-col w-full h-screen overflow-y-auto pt-24 pb-40">
-        <div className="fixed top-0 left-0 right-0 z-10 flex items-center p-2 border-b bg-background">
+      <div className="flex h-full w-full flex-col overflow-y-auto bg-background pt-14">
+        <div className="fixed top-0 left-0 right-0 z-10 flex items-center border-b bg-background p-2">
           <Button variant="ghost" size="icon" onClick={() => router.back()}>
             <ArrowLeft />
           </Button>
         </div>
-        <div className="flex-1 w-full p-2">
+        <div className="flex-1 w-full p-3">
           {children}
         </div>
       </div>

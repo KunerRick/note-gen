@@ -3,6 +3,7 @@
 import { ThemeProvider } from "@/components/theme-provider"
 import useSettingStore from "@/stores/setting"
 import { useEffect } from "react"
+import { usePathname } from "next/navigation"
 import { applyThemeColors } from "@/lib/theme-utils"
 import { initAllDatabases } from "@/db"
 import dayjs from "dayjs"
@@ -30,6 +31,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const pathname = usePathname()
   const { initSettingData, customThemeColors } = useSettingStore()
   const { initMainHosting } = useImageStore()
   const { currentLocale } = useI18n()
@@ -67,6 +69,8 @@ export default function RootLayout({
     applyThemeColors(customThemeColors)
   }, [customThemeColors])
 
+  const hideFootbar = pathname.startsWith('/mobile/setting/pages')
+
   return (
     <ThemeProvider
       attribute="class"
@@ -81,7 +85,7 @@ export default function RootLayout({
             <main className="flex flex-1 w-full overflow-hidden">
               {children}
             </main>
-            <AppFootbar />
+            {!hideFootbar ? <AppFootbar /> : null}
           </div>
           {/* 隐藏的记录工具组件，用于监听事件 */}
           <div className="absolute opacity-0 pointer-events-none -z-50">

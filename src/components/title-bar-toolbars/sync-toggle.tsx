@@ -13,6 +13,13 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import {
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerTitle,
+  DrawerTrigger,
+} from "@/components/ui/drawer"
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -92,7 +99,7 @@ import { s3Upload, s3Download, s3HeadObject, s3Delete, testS3Connection } from "
 import { webdavUpload, webdavDownload, webdavHeadObject, webdavDelete, testWebDAVConnection } from "@/lib/sync/webdav"
 import { S3Config, WebDAVConfig, SyncPlatform } from "@/types/sync"
 import { filterSyncData, mergeSyncData } from "@/config/sync-exclusions"
-import { confirm, save, open } from "@tauri-apps/plugin-dialog"
+import { confirm, save, open as openDialog } from "@tauri-apps/plugin-dialog"
 import { invoke } from "@tauri-apps/api/core"
 import { SyncStateEnum } from "@/lib/sync/github.types"
 import dayjs from "dayjs"
@@ -304,13 +311,17 @@ interface ProviderInfo {
   status: ProviderStatus
 }
 
-export function SyncToggle() {
+interface SyncToggleProps {
+  presentation?: 'popover' | 'drawer'
+}
+
+export function SyncToggle({ presentation = 'popover' }: SyncToggleProps) {
   const t = useTranslations()
   const router = useRouter()
   const [syncing, setSyncing] = useState(false)
   const [exporting, setExporting] = useState(false)
   const [importing, setImporting] = useState(false)
-  const [popoverOpen, setPopoverOpen] = useState(false)
+  const [open, setOpen] = useState(false)
   const [providers, setProviders] = useState<ProviderInfo[]>([])
 
   const { primaryBackupMethod, setPrimaryBackupMethod } = useSettingStore()
@@ -488,11 +499,11 @@ export function SyncToggle() {
     loadProviderStatus()
 
     // 弹窗打开时检测 S3 和 WebDAV 连接状态
-    if (popoverOpen) {
+    if (open) {
       checkS3Status()
       checkWebDAVStatus()
     }
-  }, [popoverOpen, syncRepoState, giteeSyncRepoState, gitlabSyncProjectState, giteaSyncRepoState, s3Connected, webdavConnected])
+  }, [open, syncRepoState, giteeSyncRepoState, gitlabSyncProjectState, giteaSyncRepoState, s3Connected, webdavConnected])
 
   // 获取当前方案的显示文本
   const getCurrentProviderDisplay = () => {
@@ -865,7 +876,7 @@ export function SyncToggle() {
         return;
       }
 
-      const filePath = await open({
+      const filePath = await openDialog({
         title: t('settings.backupSync.localBackup.importDialog.title'),
         multiple: false,
         directory: false,
@@ -903,23 +914,132 @@ export function SyncToggle() {
     }
   }
 
+  const syncButton = (
+    <Button
+      variant="ghost"
+      size="icon"
+      className="h-8 w-8"
+      disabled={syncing || exporting || importing}
+    >
+      {syncing || exporting || importing ? (
+        <Loader2 className="h-4 w-4 animate-spin" />
+      ) : (
+        <CloudSync className="h-4 w-4" />
+      )}
+    </Button>
+  )
+
+  const syncPanel = (
+    <div className="space-y-4">
+      <div className="flex items-center gap-2">
+        <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-700"></div>
+        <span className="text-xs text-zinc-400">{t('settings.sync.cloudSync')}</span>
+        <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-700"></div>
+      </div>
+
+      <div>
+        <Select value={primaryBackupMethod} onValueChange={handleProviderChange}>
+          <SelectTrigger className="w-full">
+            <span className="flex items-center gap-2">
+              <span className="mr-2">
+                {getStatusIcon(providers.find(p => p.platform === primaryBackupMethod)?.status || 'unconfigured')}
+              </span>
+              <SelectValue placeholder={t('settings.sync.selectPlatform')}>
+                {getCurrentProviderDisplay()}
+              </SelectValue>
+            </span>
+          </SelectTrigger>
+          <SelectContent>
+            {providers.map((provider) => (
+              <SelectItem key={provider.platform} value={provider.platform}>
+                <span className="flex items-center gap-2">
+                  <span>{provider.name}</span>
+                  {provider.status === 'unconfigured' && (
+                    <span className="text-zinc-400 text-xs ml-auto">
+                      {t('settings.sync.status.unconfigured')}
+                    </span>
+                  )}
+                </span>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={uploadAll}
+          disabled={syncing}
+        >
+          <UploadCloud className="mr-2 h-4 w-4" />
+          {t('settings.sync.uploadRecords')}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={downloadAll}
+          disabled={syncing}
+        >
+          <DownloadCloud className="mr-2 h-4 w-4" />
+          {t('settings.sync.downloadConfig')}
+        </Button>
+      </div>
+
+      <div className="flex items-center gap-2">
+        <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-700"></div>
+        <span className="text-xs text-zinc-400">{t('settings.sync.localBackupAll')}</span>
+        <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-700"></div>
+      </div>
+
+      <div className="flex flex-col gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleExport}
+          disabled={exporting}
+        >
+          <Download className="mr-2 h-4 w-4" />
+          {t('settings.backupSync.localBackup.export.button')}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={handleImport}
+          disabled={importing}
+        >
+          <Upload className="mr-2 h-4 w-4" />
+          {t('settings.backupSync.localBackup.import.button')}
+        </Button>
+      </div>
+    </div>
+  )
+
+  if (presentation === 'drawer') {
+    return (
+      <Drawer open={open} onOpenChange={setOpen}>
+        <DrawerTrigger asChild>
+          {syncButton}
+        </DrawerTrigger>
+        <DrawerContent className="max-h-[82vh] rounded-t-[24px]">
+          <DrawerHeader className="text-left">
+            <DrawerTitle>{t('common.sync')}</DrawerTitle>
+          </DrawerHeader>
+          <div className="overflow-y-auto px-4 pb-6">
+            {syncPanel}
+          </div>
+        </DrawerContent>
+      </Drawer>
+    )
+  }
+
   return (
-    <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+    <Popover open={open} onOpenChange={setOpen}>
       <Tooltip>
         <TooltipTrigger asChild>
           <PopoverTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              disabled={syncing || exporting || importing}
-            >
-              {syncing || exporting || importing ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <CloudSync className="h-4 w-4" />
-              )}
-            </Button>
+            {syncButton}
           </PopoverTrigger>
         </TooltipTrigger>
         <TooltipContent side="bottom">
@@ -927,95 +1047,7 @@ export function SyncToggle() {
         </TooltipContent>
       </Tooltip>
       <PopoverContent align="end" className="w-72">
-        <div className="space-y-4">
-          {/* 记录与配置同步分隔线 */}
-          <div className="flex items-center gap-2">
-            <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-700"></div>
-            <span className="text-xs text-zinc-400">{t('settings.sync.cloudSync')}</span>
-            <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-700"></div>
-          </div>
-
-          {/* 方案选择器 */}
-          <div>
-            <Select value={primaryBackupMethod} onValueChange={handleProviderChange}>
-              <SelectTrigger className="w-full">
-                <span className="flex items-center gap-2">
-                  <span className="mr-2">
-                    {getStatusIcon(providers.find(p => p.platform === primaryBackupMethod)?.status || 'unconfigured')}
-                  </span>
-                  <SelectValue placeholder={t('settings.sync.selectPlatform')}>
-                    {getCurrentProviderDisplay()}
-                  </SelectValue>
-                </span>
-              </SelectTrigger>
-              <SelectContent>
-                {providers.map((provider) => (
-                  <SelectItem key={provider.platform} value={provider.platform}>
-                    <span className="flex items-center gap-2">
-                      <span>{provider.name}</span>
-                      {provider.status === 'unconfigured' && (
-                        <span className="text-zinc-400 text-xs ml-auto">
-                          {t('settings.sync.status.unconfigured')}
-                        </span>
-                      )}
-                    </span>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-
-          {/* 网络备份操作 */}
-          <div className="flex flex-col gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={uploadAll}
-              disabled={syncing}
-            >
-              <UploadCloud className="mr-2 h-4 w-4" />
-              {t('settings.sync.uploadRecords')}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={downloadAll}
-              disabled={syncing}
-            >
-              <DownloadCloud className="mr-2 h-4 w-4" />
-              {t('settings.sync.downloadConfig')}
-            </Button>
-          </div>
-
-          {/* 分隔线 */}
-          <div className="flex items-center gap-2">
-            <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-700"></div>
-            <span className="text-xs text-zinc-400">{t('settings.sync.localBackupAll')}</span>
-            <div className="h-px flex-1 bg-zinc-200 dark:bg-zinc-700"></div>
-          </div>
-
-          {/* 本地备份操作 */}
-          <div className="flex flex-col gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleExport}
-              disabled={exporting}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              {t('settings.backupSync.localBackup.export.button')}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleImport}
-              disabled={importing}
-            >
-              <Upload className="mr-2 h-4 w-4" />
-              {t('settings.backupSync.localBackup.import.button')}
-            </Button>
-          </div>
-        </div>
+        {syncPanel}
       </PopoverContent>
     </Popover>
   )

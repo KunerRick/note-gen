@@ -1948,6 +1948,7 @@
     "record": "记录",
     "quickRecord": "快捷记录",
     "write": "写作",
+    "me": "我的",
     "search": "搜索",
     "githubImageHosting": "Github 图床",
     "login": "登录",
@@ -2411,6 +2412,48 @@
     }
   },
   "mobile": {
+    "me": {
+      "profile": {
+        "deviceName": "同步平台",
+        "deviceSubtitle": "同步你的记录与设置",
+        "syncPlatform": "同步平台",
+        "gitSubtitle": "已连接 {provider}，可以同步你的记录与设置",
+        "storageSubtitle": "当前通过 {provider} 同步你的记录与设置",
+        "unconfiguredSubtitle": "还没有配置同步，当前数据仅保存在本地",
+        "streak": "已连续活跃 {count} 天"
+      },
+      "activity": {
+        "tip": "点击热力图中的日期，查看当天的活动时间轴。",
+        "range": "最近 {count} 周",
+        "rangePlaceholder": "最近 16 周",
+        "drawerEmpty": "选择一个日期查看当天的活动详情。",
+        "drawerSummary": "当天共 {total} 条活动，含 {record} 条记录、{writing} 条写作、{chat} 条对话。"
+      },
+      "sync": {
+        "title": "同步",
+        "configured": "已连接",
+        "unconfigured": "未配置",
+        "localOnly": "本地存储"
+      },
+      "stats": {
+        "weekly": "本周活跃",
+        "weeklyHint": "本周累计活动次数",
+        "streak": "连续活跃",
+        "streakHint": "连续活跃天数"
+      },
+      "status": {
+        "title": "当前配置",
+        "sync": "备份方案",
+        "model": "默认模型",
+        "configured": "已连接",
+        "unconfigured": "未配置",
+        "modelFallback": "未设置默认模型"
+      },
+      "settings": {
+        "title": "设置",
+        "description": "直接在这里进入各项功能设置。"
+      }
+    },
     "chat": {
       "drawer": {
         "settings": {

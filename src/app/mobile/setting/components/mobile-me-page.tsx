@@ -1,0 +1,265 @@
+'use client'
+
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { RefreshCw } from 'lucide-react'
+import { useTranslations } from 'next-intl'
+
+import { ActivityHeatmap } from '@/components/activity/activity-heatmap'
+import { Button } from '@/components/ui/button'
+import { loadActivityCalendarData } from '@/lib/activity'
+import type { ActivityCalendarData, ActivityDaySummary } from '@/lib/activity/types'
+import useSettingStore from '@/stores/setting'
+import useSyncStore from '@/stores/sync'
+import { MobileMeActivityDrawer } from './mobile-me-activity-drawer'
+import { buildActivityDaySummaryText, buildProfileCardData, getBackupMethodStatus, getBackupProviderName, getCurrentActivityStreak, getCurrentWeekActivityCount } from './mobile-me-helpers'
+import { MobileMeProfileCard } from './mobile-me-profile-card'
+import { SettingTab } from './setting-tab'
+
+const MOBILE_HEATMAP_WEEKS = 16
+const MOBILE_ME_SCROLL_KEY = 'mobile-me-scroll-top'
+
+export function MobileMePage() {
+  const tActivity = useTranslations('activity')
+  const tMe = useTranslations('mobile.me')
+
+  const [activityData, setActivityData] = useState<ActivityCalendarData | null>(null)
+  const [selectedDay, setSelectedDay] = useState<ActivityDaySummary | undefined>(undefined)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const containerRef = useRef<HTMLDivElement | null>(null)
+  const restoredScrollRef = useRef(false)
+
+  const { primaryBackupMethod } = useSettingStore()
+  const {
+    userInfo,
+    giteeUserInfo,
+    gitlabUserInfo,
+    giteaUserInfo,
+    syncRepoState,
+    giteeSyncRepoState,
+    gitlabSyncProjectState,
+    giteaSyncRepoState,
+    s3Connected,
+    webdavConnected,
+  } = useSyncStore()
+
+  async function refreshActivity() {
+    setLoading(true)
+    try {
+      const nextData = await loadActivityCalendarData()
+      setActivityData(nextData)
+      setSelectedDay((currentDay) => {
+        if (currentDay) {
+          return nextData.days.find((day) => day.day === currentDay.day) || currentDay
+        }
+
+        return nextData.days.find((day) => day.day === nextData.endDate)
+          || [...nextData.days].reverse().find((day) => day.totalCount > 0)
+      })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    refreshActivity()
+  }, [])
+
+  useEffect(() => {
+    if (restoredScrollRef.current) return
+    if (!containerRef.current) return
+
+    const savedScrollTop = window.sessionStorage.getItem(MOBILE_ME_SCROLL_KEY)
+    if (!savedScrollTop) {
+      restoredScrollRef.current = true
+      return
+    }
+
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        if (!containerRef.current) return
+        containerRef.current.scrollTop = Number(savedScrollTop)
+        restoredScrollRef.current = true
+      })
+    })
+  }, [activityData])
+
+  const currentWeekCount = useMemo(() => getCurrentWeekActivityCount(activityData), [activityData])
+  const currentStreak = useMemo(() => getCurrentActivityStreak(activityData), [activityData])
+  const visibleWeeks = useMemo(
+    () => activityData ? activityData.weeks.slice(-MOBILE_HEATMAP_WEEKS) : [],
+    [activityData]
+  )
+
+  const profile = useMemo(() => buildProfileCardData({
+    primaryBackupMethod,
+    githubUser: userInfo,
+    giteeUser: giteeUserInfo,
+    gitlabUser: gitlabUserInfo,
+    giteaUser: giteaUserInfo,
+    fallbackName: tMe('profile.deviceName'),
+    fallbackSubtitle: tMe('profile.deviceSubtitle'),
+    streak: currentStreak,
+    streakLabel: tMe('profile.streak'),
+  }), [primaryBackupMethod, userInfo, giteeUserInfo, gitlabUserInfo, giteaUserInfo, tMe, currentStreak])
+
+  const daySummary = useMemo(() => buildActivityDaySummaryText(selectedDay, {
+    empty: tMe('activity.drawerEmpty'),
+    summary: tMe('activity.drawerSummary'),
+  }), [selectedDay, tMe])
+
+  const syncStatus = useMemo(() => getBackupMethodStatus({
+    primaryBackupMethod,
+    syncRepoState,
+    giteeSyncRepoState,
+    gitlabSyncProjectState,
+    giteaSyncRepoState,
+    s3Connected,
+    webdavConnected,
+    configuredLabel: tMe('sync.configured'),
+    unavailableLabel: tMe('sync.unconfigured'),
+  }), [
+    primaryBackupMethod,
+    syncRepoState,
+    giteeSyncRepoState,
+    gitlabSyncProjectState,
+    giteaSyncRepoState,
+    s3Connected,
+    webdavConnected,
+    tMe,
+  ])
+
+  const profileProviderType = useMemo<'git' | 'storage' | 'unconfigured'>(() => {
+    const hasGitIdentity = Boolean(profile.avatarUrl)
+    if (hasGitIdentity) return 'git'
+    if (primaryBackupMethod === 's3' || primaryBackupMethod === 'webdav') return 'storage'
+    if (syncStatus === tMe('sync.unconfigured')) return 'unconfigured'
+    return 'git'
+  }, [profile.avatarUrl, primaryBackupMethod, syncStatus, tMe])
+
+  const providerName = useMemo(() => {
+    if (syncStatus === tMe('sync.unconfigured')) {
+      return tMe('sync.localOnly')
+    }
+
+    return getBackupProviderName(primaryBackupMethod)
+  }, [primaryBackupMethod, syncStatus, tMe])
+
+  const profileCardName = useMemo(() => {
+    if (profileProviderType === 'git') {
+      return profile.name
+    }
+
+    return tMe('profile.syncPlatform')
+  }, [profile.name, profileProviderType, tMe])
+
+  const profileCardSubtitle = useMemo(() => {
+    if (profileProviderType === 'git' && providerName) {
+      return tMe('profile.gitSubtitle', { provider: providerName })
+    }
+
+    if (profileProviderType === 'storage' && providerName) {
+      return tMe('profile.storageSubtitle', { provider: providerName })
+    }
+
+    return tMe('profile.unconfiguredSubtitle')
+  }, [profileProviderType, providerName, tMe])
+
+  function handleSelectDay(day: ActivityDaySummary) {
+    setSelectedDay(day)
+    setDrawerOpen(true)
+  }
+
+  return (
+    <div
+      id="mobile-me"
+      ref={containerRef}
+      className="flex h-full w-full flex-col overflow-y-auto"
+      onScroll={(event) => {
+        window.sessionStorage.setItem(MOBILE_ME_SCROLL_KEY, String(event.currentTarget.scrollTop))
+      }}
+    >
+      <div className="flex-1 space-y-4 px-3 py-4">
+        <MobileMeProfileCard
+          name={profileCardName}
+          subtitle={profileCardSubtitle}
+          avatarUrl={profile.avatarUrl}
+          syncStatus={syncStatus}
+          providerName={providerName}
+          providerType={profileProviderType}
+        />
+
+        <section className="rounded-3xl border border-border/60 bg-card p-4 shadow-sm">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="text-base font-semibold">{tActivity('drawer.title')}</h2>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {activityData ? tMe('activity.range', { count: MOBILE_HEATMAP_WEEKS }) : tMe('activity.rangePlaceholder')}
+              </p>
+            </div>
+            <Button variant="ghost" size="icon" onClick={refreshActivity} aria-label={tActivity('refresh')}>
+              <RefreshCw className={`size-4 ${loading ? 'animate-spin' : ''}`} />
+            </Button>
+          </div>
+
+          {loading && !activityData ? (
+            <div className="py-10 text-center text-sm text-muted-foreground">{tActivity('loading')}</div>
+          ) : activityData ? (
+            <>
+              <ActivityHeatmap
+                weeks={visibleWeeks}
+                selectedDay={selectedDay?.day}
+                onSelectDay={handleSelectDay}
+                compact
+                adaptive
+                labels={{
+                  dayCount: tActivity('heatmap.dayCount'),
+                  emptyDay: tActivity('heatmap.emptyDay'),
+                }}
+              />
+              <p className="mt-3 text-xs leading-5 text-muted-foreground">{tMe('activity.tip')}</p>
+            </>
+          ) : (
+            <div className="py-10 text-center text-sm text-muted-foreground">{tActivity('empty')}</div>
+          )}
+        </section>
+
+        <section className="grid grid-cols-2 gap-3">
+          <div className="rounded-3xl border border-border/60 bg-card p-4 shadow-sm">
+            <p className="text-xs text-muted-foreground">{tMe('stats.weekly')}</p>
+            <p className="mt-2 text-2xl font-semibold">{currentWeekCount}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{tMe('stats.weeklyHint')}</p>
+          </div>
+          <div className="rounded-3xl border border-border/60 bg-card p-4 shadow-sm">
+            <p className="text-xs text-muted-foreground">{tMe('stats.streak')}</p>
+            <p className="mt-2 text-2xl font-semibold">{currentStreak}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{tMe('stats.streakHint')}</p>
+          </div>
+        </section>
+
+        <section className="rounded-3xl border border-border/60 bg-card shadow-sm">
+          <div className="border-b border-border/60 px-4 py-3">
+            <h2 className="text-base font-semibold">{tMe('settings.title')}</h2>
+            <p className="mt-1 text-xs text-muted-foreground">{tMe('settings.description')}</p>
+          </div>
+          <SettingTab />
+        </section>
+      </div>
+
+      <MobileMeActivityDrawer
+        day={selectedDay}
+        open={drawerOpen}
+        onOpenChange={setDrawerOpen}
+        summaryText={daySummary}
+        labels={{
+          title: tActivity('detail.title'),
+          description: tMe('activity.drawerEmpty'),
+          empty: tActivity('detail.empty'),
+          records: tActivity('labels.record'),
+          writing: tActivity('labels.writing'),
+          chats: tActivity('labels.chat'),
+        }}
+      />
+    </div>
+  )
+}
