@@ -2,19 +2,19 @@
 
 ## 一、核心问题结论（精简版）
 
-### 问题1：图片资源同步缺失（优先级：高）
+### 问题1：图片资源同步缺失（优先级：高） ✅ **已解决**
 
-**现状**：插入文档的本地图片仅保存在本地 `images` 目录，**完全不会**同步到 Git 远端。
+**现状**：图片同步功能已实现并集成到同步流程中。
 
-**影响**：
-- 跨设备文档图片全部失效
-- 备份数据不完整
-- 用户无感知，直到换设备才发现
+**实现位置**：
+- `src/lib/sync/image-sync.ts` - 图片同步核心模块
+- `src/lib/sync/sync-push-queue.ts` (第456-473行) - 自动同步时触发图片同步
+- `src/app/core/main/editor/markdown/sync/sync-button.tsx` - 手动同步时触发图片同步
 
-**技术债务**：
-- `src/lib/image-handler.ts` 只处理本地保存
-- `src/lib/sync/sync-manager.ts` 仅同步文本文件
-- 无任何图片依赖追踪机制
+**工作流程**：
+1. 文档同步成功后，自动提取 Markdown 中的本地图片路径
+2. 调用 `syncImagesForDocument()` 上传所有依赖图片
+3. 支持 GitHub、Gitee、GitLab、Gitea、S3、WebDAV 全平台
 
 ---
 
@@ -115,9 +115,10 @@
 
 ## 三、实现优先级与里程碑
 
-### 第一阶段（必选）
-- [ ] 图片依赖解析函数
-- [ ] `sync-manager.ts` 增强（推送图片）
+### 第一阶段（必选）✅ **已完成**
+- [x] 图片依赖解析函数 (`syncImagesForDocument` in `image-sync.ts`)
+- [x] `sync-push-queue.ts` 增强（自动同步时推送图片）
+- [x] `sync-button.tsx` 增强（手动同步时推送图片）
 - [ ] 同步仪表板基础统计
 - [ ] 一键同步所有按钮
 

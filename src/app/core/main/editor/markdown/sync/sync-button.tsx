@@ -10,6 +10,7 @@ import { getSyncRepoName } from '@/lib/sync/repo-utils'
 import { getWorkspacePath, getFilePathOptions } from '@/lib/workspace'
 import { readTextFile } from '@tauri-apps/plugin-fs'
 import { isSyncConfigured } from '@/lib/sync/sync-manager'
+import { syncImagesForDocument } from '@/lib/sync/image-sync'
 import emitter from '@/lib/emitter'
 
 export function SyncButton() {
@@ -19,6 +20,7 @@ export function SyncButton() {
   const [showSuccess, setShowSuccess] = useState(false)
   const [showError, setShowError] = useState(false)
   const [lastPushTime, setLastPushTime] = useState<Date | null>(null)
+  const [imageSyncInfo, setImageSyncInfo] = useState<{ total: number; success: number; failed: number } | null>(null)
   const successTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const errorTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -80,6 +82,27 @@ export function SyncButton() {
       if (errorTimerRef.current) {
         clearTimeout(errorTimerRef.current)
       }
+    }
+  }, [activeFilePath])
+
+  // 监听图片同步完成事件
+  useEffect(() => {
+    const handleImagesCompleted = (event: { path: string; totalImages: number; successCount: number; failedCount: number }) => {
+      if (activeFilePath && event.path === activeFilePath) {
+        setImageSyncInfo({
+          total: event.totalImages,
+          success: event.successCount,
+          failed: event.failedCount
+        })
+        // 3秒后清除图片同步信息
+        setTimeout(() => {
+          setImageSyncInfo(null)
+        }, 3000)
+      }
+    }
+    emitter.on('sync-images-completed', handleImagesCompleted as any)
+    return () => {
+      emitter.off('sync-images-completed', handleImagesCompleted as any)
     }
   }, [activeFilePath])
 
@@ -212,6 +235,24 @@ ${content.slice(0, 1000)}${content.length > 1000 ? '...' : ''}
       }
 
       if (success) {
+        // 推送文档成功后，同步关联的图片（仅针对 Markdown 文件）
+        const isMarkdown = activeFilePath.endsWith('.md') || activeFilePath.endsWith('.markdown')
+        if (isMarkdown) {
+          console.log(`[SyncButton] Starting image sync for ${activeFilePath}`)
+          try {
+            const imageResult = await syncImagesForDocument(activeFilePath, content)
+            console.log(`[SyncButton] Image sync result: ${imageResult.totalImages} images found, ${imageResult.successCount} synced, ${imageResult.failedCount} failed`)
+            // 发送图片同步完成事件
+            emitter.emit('sync-images-completed', {
+              path: activeFilePath,
+              totalImages: imageResult.totalImages,
+              successCount: imageResult.successCount,
+              failedCount: imageResult.failedCount
+            })
+          } catch (error) {
+            console.error(`[SyncButton] Image sync error for ${activeFilePath}:`, error)
+          }
+        }
         emitter.emit('sync-push-completed', { path: activeFilePath, success: true })
       } else {
         throw new Error('File may not exist on remote')
@@ -243,10 +284,18 @@ ${content.slice(0, 1000)}${content.length > 1000 ? '...' : ''}
 
       {/* 成功推送状态 */}
       {showSuccess && !isLoading && (
-        <span className="text-xs text-green-500 flex items-center gap-1 animate-pulse">
-          <CheckCircle size={12} />
-          {lastPushTime && formatTime(lastPushTime)}
-        </span>
+        <div className="flex flex-col items-end gap-0.5">
+          <span className="text-xs text-green-500 flex items-center gap-1 animate-pulse">
+            <CheckCircle size={12} />
+            {lastPushTime && formatTime(lastPushTime)}
+          </span>
+          {imageSyncInfo && imageSyncInfo.total > 0 && (
+            <span className="text-xs text-muted-foreground">
+              图片: {imageSyncInfo.success}/{imageSyncInfo.total}
+              {imageSyncInfo.failed > 0 && <span className="text-red-500"> ({imageSyncInfo.failed}失败)</span>}
+            </span>
+          )}
+        </div>
       )}
 
       {/* 失败推送状态 */}
