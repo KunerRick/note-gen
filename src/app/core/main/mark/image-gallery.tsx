@@ -3,7 +3,7 @@
 import { Mark, delMark, updateMark } from "@/db/marks"
 import { useState, useEffect } from "react"
 import { cn, convertImage } from "@/lib/utils"
-import { PhotoProvider, PhotoView } from "react-photo-view"
+import { PhotoView } from "react-photo-view"
 import { LocalImage } from "@/components/local-image"
 import { useTranslations } from "next-intl"
 import useMarkStore from "@/stores/mark"
@@ -23,6 +23,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu"
 import Image from "next/image"
+import { PhotoPreviewProvider } from "@/components/photo-preview-provider"
 
 interface ImageGalleryProps {
   marks: Mark[]
@@ -102,7 +103,7 @@ function ImageItem({ mark }: { mark: Mark }) {
   return (
     <ContextMenu>
       <ContextMenuTrigger>
-        <PhotoProvider>
+        <PhotoPreviewProvider>
           <PhotoView src={photoSrc}>
             <div className="aspect-square overflow-hidden rounded cursor-pointer bg-zinc-900">
               {mark.url.includes('http') ? (
@@ -123,7 +124,7 @@ function ImageItem({ mark }: { mark: Mark }) {
               )}
             </div>
           </PhotoView>
-        </PhotoProvider>
+        </PhotoPreviewProvider>
       </ContextMenuTrigger>
       <ContextMenuContent>
         <ContextMenuSub>
