@@ -1,0 +1,7 @@
+onlyBuiltDependencies:
+  - '@parcel/watcher'
+  - core-js
+  - esbuild
+  - sharp
+  - tesseract.js
+  - unrs-resolver
