@@ -18,6 +18,7 @@ target/*
 .claude/*
 .superpowers/*
 .agents/*
+.trae/*
 /docs/*/*
 skills-lock.json
 
