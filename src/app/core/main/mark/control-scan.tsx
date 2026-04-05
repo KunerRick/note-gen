@@ -20,7 +20,7 @@ import {
 import { Card, CardContent } from "@/components/ui/card"
 import { useRef } from "react";
 import { ScreenshotImage } from "note-gen/screenshot"
-import { BaseDirectory, writeFile } from "@tauri-apps/plugin-fs"
+import { BaseDirectory, exists, remove, writeFile } from "@tauri-apps/plugin-fs"
 import Cropper from 'cropperjs';
 import 'cropperjs/dist/cropper.css';
 import './crop.css'
@@ -48,6 +48,17 @@ export function ControlScan() {
   const { currentTagId, fetchTags, getCurrentTag } = useTagStore()
   const { fetchMarks, addQueue, removeQueue, setQueue } = useMarkStore()
   const { primaryModel, primaryImageMethod, enableImageRecognition } = useSettingStore()
+
+  const cleanupTempScreenshots = useCallback(async () => {
+    try {
+      const tempDirExists = await exists('temp_screenshot', { baseDir: BaseDirectory.AppData })
+      if (tempDirExists) {
+        await remove('temp_screenshot', { baseDir: BaseDirectory.AppData, recursive: true })
+      }
+    } catch (error) {
+      console.error('Failed to cleanup temp screenshots:', error)
+    }
+  }, [])
 
   function initCropper() {
     cropperRef.current?.destroy()
@@ -91,7 +102,7 @@ export function ControlScan() {
     setSelectedImageSrc(file.path)
   }
 
-  async function cropEnd() {
+  const cropEnd = useCallback(async () => {
     setOpen(false)
     const queueId = uuid()
     if (!cropperRef.current) return
@@ -137,7 +148,20 @@ export function ControlScan() {
       await fetchTags()
       getCurrentTag()
     })
-  };
+  }, [
+    addQueue,
+    currentTagId,
+    enableImageRecognition,
+    fetchMarks,
+    fetchTags,
+    getCurrentTag,
+    primaryImageMethod,
+    primaryModel,
+    removeQueue,
+    router,
+    setQueue,
+    t,
+  ])
 
   useEffect(() => {
     if (!open) {
@@ -145,8 +169,11 @@ export function ControlScan() {
       cropperRef.current = null
       cropBoxRef.current?.removeEventListener('dblclick', cropEnd)
       cropBoxRef.current = null
+      setFiles((currentFiles) => (currentFiles.length > 0 ? [] : currentFiles))
+      setSelectedImageSrc((currentSrc) => (currentSrc ? '' : currentSrc))
+      void cleanupTempScreenshots()
     }
-  }, [open])
+  }, [cleanupTempScreenshots, cropEnd, open])
 
   const handleScan = useCallback(() => {
     createScreenShot()

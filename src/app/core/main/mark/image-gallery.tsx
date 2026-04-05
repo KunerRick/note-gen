@@ -9,7 +9,7 @@ import { useTranslations } from "next-intl"
 import useMarkStore from "@/stores/mark"
 import useTagStore from "@/stores/tag"
 import { appDataDir } from "@tauri-apps/api/path"
-import { open } from "@tauri-apps/plugin-shell"
+import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener"
 import { toast } from "@/hooks/use-toast"
 import { fetchAiDesc } from "@/lib/ai/description"
 import {
@@ -24,6 +24,7 @@ import {
 } from "@/components/ui/context-menu"
 import Image from "next/image"
 import { PhotoPreviewProvider } from "@/components/photo-preview-provider"
+import { getMarkOpenAction } from "./mark-open-path"
 
 interface ImageGalleryProps {
   marks: Mark[]
@@ -77,19 +78,24 @@ function ImageItem({ mark }: { mark: Mark }) {
   async function handelShowInFolder(e?: React.MouseEvent) {
     e?.stopPropagation()
     const appDir = await appDataDir()
-    const path = mark.type === 'scan' ? 'screenshot' : 'image'
-    open(`${appDir}/${path}`)
+    const action = getMarkOpenAction(mark, appDir, 'folder')
+    if (!action?.path) return
+
+    if (action.mode === 'reveal') {
+      await revealItemInDir(action.path)
+      return
+    }
+
+    await openPath(action.path)
   }
 
   async function handelShowInFile(e?: React.MouseEvent) {
     e?.stopPropagation()
     const appDir = await appDataDir()
-    const path = mark.type === 'scan' ? 'screenshot' : 'image'
-    let filename = mark.url
-    if (mark.url.includes('http')) {
-      filename = mark.url.split('/').pop() || '';
-    }
-    open(`${appDir}/${path}/${filename}`)
+    const action = getMarkOpenAction(mark, appDir, 'file')
+    if (!action?.path) return
+
+    await openPath(action.path)
   }
 
   async function handleCopyLink(e?: React.MouseEvent) {
@@ -153,10 +159,10 @@ function ImageItem({ mark }: { mark: Mark }) {
           {t('record.mark.toolbar.regenerateDesc')}
         </ContextMenuItem>
         <ContextMenuSeparator />
-        <ContextMenuItem inset onClick={handelShowInFolder}>
+        <ContextMenuItem inset disabled={!getMarkOpenAction(mark, '', 'folder')?.path} onClick={handelShowInFolder}>
           {t('record.mark.toolbar.viewFolder')}
         </ContextMenuItem>
-        <ContextMenuItem inset onClick={handelShowInFile}>
+        <ContextMenuItem inset disabled={!getMarkOpenAction(mark, '', 'file')?.path} onClick={handelShowInFile}>
           {t('record.mark.toolbar.viewFile')}
         </ContextMenuItem>
         <ContextMenuItem inset onClick={handleDelMark}>

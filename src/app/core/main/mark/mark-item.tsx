@@ -23,7 +23,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { appDataDir } from "@tauri-apps/api/path";
 import { CheckSquare, ImageUp, RefreshCw, Settings2, Square } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { openPath } from "@tauri-apps/plugin-opener";
+import { openPath, revealItemInDir } from "@tauri-apps/plugin-opener";
 import { Textarea } from "@/components/ui/textarea";
 import { AudioPlayer } from "@/components/audio-player";
 import { ImageViewer } from "@/components/image-viewer";
@@ -40,7 +40,7 @@ import { NO_TRANSCRIPTION_MESSAGE, transcribeRecording } from "@/lib/audio";
 import { getMarkTypeListBadgeClasses } from "./mark-type-meta";
 import { getMarkListItemContent } from "./mark-list-item-content";
 import { TodoEditTrigger } from "./todo-edit-button";
-import { canOpenMarkSource, getMarkOpenTargets } from "./mark-open-path";
+import { canOpenMarkSource, getMarkOpenAction } from "./mark-open-path";
 
 dayjs.extend(relativeTime)
 
@@ -597,13 +597,18 @@ export const MarkItem = React.memo(({mark, variant = 'list'}: {mark: Mark, varia
     e?.stopPropagation()
     try {
       const appDir = await appDataDir()
-      const { folderPath } = getMarkOpenTargets(mark, appDir)
+      const action = getMarkOpenAction(mark, appDir, 'folder')
 
-      if (!folderPath) {
+      if (!action?.path) {
         return
       }
 
-      await openPath(folderPath)
+      if (action.mode === 'reveal') {
+        await revealItemInDir(action.path)
+        return
+      }
+
+      await openPath(action.path)
     } catch (error) {
       console.error('Failed to open source folder:', error)
     }
@@ -613,13 +618,13 @@ export const MarkItem = React.memo(({mark, variant = 'list'}: {mark: Mark, varia
     e?.stopPropagation()
     try {
       const appDir = await appDataDir()
-      const { filePath } = getMarkOpenTargets(mark, appDir)
+      const action = getMarkOpenAction(mark, appDir, 'file')
 
-      if (!filePath) {
+      if (!action?.path) {
         return
       }
 
-      await openPath(filePath)
+      await openPath(action.path)
     } catch (error) {
       console.error('Failed to open source file:', error)
     }

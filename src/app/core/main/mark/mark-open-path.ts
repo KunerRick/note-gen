@@ -5,6 +5,11 @@ interface MarkOpenTargets {
   folderPath: string | null
 }
 
+export interface MarkOpenAction {
+  mode: 'open' | 'reveal'
+  path: string | null
+}
+
 const HTTP_URL_PATTERN = /^https?:\/\//i
 const WINDOWS_ABSOLUTE_PATH_PATTERN = /^[a-zA-Z]:[\\/]+/
 
@@ -21,7 +26,7 @@ function normalizePath(path: string): string {
 }
 
 function trimTrailingSlash(path: string): string {
-  return path.replace(/[\\/]+$/, '')
+  return normalizePath(path).replace(/\/+$/, '')
 }
 
 function joinPath(base: string, segment: string): string {
@@ -58,7 +63,15 @@ export function canOpenMarkSource(mark: Pick<Mark, 'type' | 'url'>): boolean {
     return false
   }
 
-  return mark.type === 'image' || mark.type === 'scan' || mark.type === 'recording' || mark.type === 'file'
+  if (mark.type === 'image' || mark.type === 'scan' || mark.type === 'recording') {
+    return !isHttpUrl(mark.url)
+  }
+
+  if (mark.type === 'file') {
+    return !isHttpUrl(mark.url) && isAbsoluteFilePath(mark.url)
+  }
+
+  return false
 }
 
 export function getMarkOpenTargets(mark: Pick<Mark, 'type' | 'url'>, appDir: string): MarkOpenTargets {
@@ -98,17 +111,11 @@ export function getMarkOpenTargets(mark: Pick<Mark, 'type' | 'url'>, appDir: str
   }
 
   if (mark.type === 'file') {
-    if (isHttpUrl(mark.url) || !isAbsoluteFilePath(mark.url)) {
-      return {
-        filePath: null,
-        folderPath: null,
-      }
-    }
-
-    const folderPath = dirname(mark.url)
+    const normalizedFilePath = normalizePath(mark.url)
+    const folderPath = dirname(normalizedFilePath)
 
     return {
-      filePath: mark.url,
+      filePath: normalizedFilePath,
       folderPath: folderPath || null,
     }
   }
@@ -117,4 +124,22 @@ export function getMarkOpenTargets(mark: Pick<Mark, 'type' | 'url'>, appDir: str
     filePath: null,
     folderPath: null,
   }
+}
+
+export function getMarkOpenAction(
+  mark: Pick<Mark, 'type' | 'url'>,
+  appDir: string,
+  target: 'folder' | 'file',
+): MarkOpenAction | null {
+  const { filePath, folderPath } = getMarkOpenTargets(mark, appDir)
+
+  if (target === 'file') {
+    return filePath ? { mode: 'open', path: filePath } : null
+  }
+
+  if (filePath) {
+    return { mode: 'reveal', path: filePath }
+  }
+
+  return folderPath ? { mode: 'open', path: folderPath } : null
 }
