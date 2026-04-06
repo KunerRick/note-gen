@@ -25,6 +25,7 @@ import { ControlRecording } from "@/app/core/main/mark/control-recording"
 import { ControlImage } from "@/app/core/main/mark/control-image"
 import { ControlLink } from "@/app/core/main/mark/control-link"
 import { ControlFile } from "@/app/core/main/mark/control-file"
+import { initMobileDebugger } from "@/lib/mobile-debug"
 
 export default function RootLayout({
   children,
@@ -42,6 +43,8 @@ export default function RootLayout({
     initMcp()
     // 上报应用启动事件
     reportAppStart()
+    // 初始化移动端调试工具（三指点击屏幕显示调试面板）
+    initMobileDebugger()
   }, [])
 
   const { initVectorDb } = useVectorStore()

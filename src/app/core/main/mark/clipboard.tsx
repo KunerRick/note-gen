@@ -11,7 +11,8 @@ import { v4 as uuid } from 'uuid'
 import ocr from "@/lib/ocr";
 import { fetchAiDesc, fetchAiDescByImage } from "@/lib/ai/description";
 import { insertMark, Mark } from "@/db/marks";
-import { uint8ArrayToBase64, uploadFile } from "@/lib/sync/github";
+import { uploadFile } from "@/lib/sync/github";
+import { uint8ArrayToBase64 } from "@/lib/base64-utils";
 import { RepoNames } from "@/lib/sync/github.types";
 import { CheckCircle, CircleX } from "lucide-react";
 import { listen } from "@tauri-apps/api/event";

@@ -1867,7 +1867,45 @@ export function TipTapEditor({
     }
   }, [editor, activeFilePath])
 
-  // Handle external content updates (e.g., from Agent tools)
+  // Handle images downloaded from remote (for mobile and remote pull scenarios)
+  useEffect(() => {
+    const handleImagesDownloaded = (event: { documentPath: string; count: number }) => {
+      // Only process if this is the active file
+      if (!editor || !event || event.documentPath !== activeFilePath) return
+
+      console.log(`[TipTapEditor] Images downloaded for ${event.documentPath}, count: ${event.count}`)
+
+      // Force re-render images by triggering transformImagePaths
+      // This will convert relative paths to asset:// URLs for the newly downloaded images
+      const editorDom = document.querySelector('.ProseMirror')
+      if (editorDom) {
+        const images = editorDom.querySelectorAll('img')
+        images.forEach((img) => {
+          const src = img.getAttribute('src')
+          // If it's a relative path, try to convert it to asset://
+          if (src && !src.startsWith('http') && !src.startsWith('asset://') && !src.startsWith('tauri://')) {
+            const currentFilePath = useArticleStore.getState().activeFilePath
+            if (currentFilePath) {
+              const fullRelativePath = resolveImagePathFromMarkdown(currentFilePath, src)
+              convertImageByWorkspace(fullRelativePath).then((assetUrl: string) => {
+                img.setAttribute('src', assetUrl)
+                console.log(`[TipTapEditor] Updated image src to: ${assetUrl}`)
+              }).catch((error) => {
+                console.error(`[TipTapEditor] Failed to convert image path: ${src}`, error)
+              })
+            }
+          }
+        })
+      }
+    }
+
+    emitter.on('images-downloaded', handleImagesDownloaded as any)
+    return () => {
+      emitter.off('images-downloaded', handleImagesDownloaded as any)
+    }
+  }, [editor, activeFilePath])
+
+  // Handle external content updates (e.g. from Agent tools)
   useEffect(() => {
     const handleExternalUpdate = (newContent: string) => {
       if (editor && externalUpdateCounterRef.current === 0) {

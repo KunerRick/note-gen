@@ -4,11 +4,8 @@ import { v4 as uuid } from 'uuid';
 import { GithubError, GithubRepoInfo, OctokitResponse } from './github.types';
 import { fetch, Proxy } from '@tauri-apps/plugin-http'
 import { buildRepoContentPath, buildRepoContentsEndpoint } from './remote-file'
+import { uint8ArrayToBase64 } from '@/lib/base64-utils'
 export { decodeBase64ToString } from './remote-file';
-
-export function uint8ArrayToBase64(data: Uint8Array) {
-  return Buffer.from(data).toString('base64');
-}
 
 // File 转换 Base64
 export async function fileToBase64(file: File) {

@@ -1,6 +1,7 @@
 import { Store } from '@tauri-apps/plugin-store'
 import { fetch, Proxy } from '@tauri-apps/plugin-http'
 import { decodeBase64ToString, getFiles as getGithubFiles, getFileCommits as getGithubFileCommits } from '@/lib/sync/github'
+import { base64ToUint8Array } from '@/lib/base64-utils'
 import { getFiles as getGiteeFiles, getFileCommits as getGiteeFileCommits } from '@/lib/sync/gitee'
 import { getFileContent as getGitlabFileContent, getFileCommits as getGitlabFileCommits } from '@/lib/sync/gitlab'
 import { getFileContent as getGiteaFileContent, getFileCommits as getGiteaFileCommits, getGiteaApiBaseUrl } from '@/lib/sync/gitea'
@@ -505,7 +506,7 @@ export async function pullRemoteImage(path: string): Promise<Uint8Array | null> 
         const file = await getGithubFiles({ path, repo: githubRepo })
         if (file && typeof file.content === 'string') {
           const base64Content = file.content.replace(/\n/g, '')
-          return Buffer.from(base64Content, 'base64')
+          return base64ToUint8Array(base64Content)
         }
         break
       }
@@ -515,7 +516,7 @@ export async function pullRemoteImage(path: string): Promise<Uint8Array | null> 
         const file = await getGiteeFiles({ path, repo: giteeRepo })
         if (file && typeof file.content === 'string') {
           const base64Content = file.content.replace(/\n/g, '')
-          return Buffer.from(base64Content, 'base64')
+          return base64ToUint8Array(base64Content)
         }
         break
       }
@@ -526,7 +527,7 @@ export async function pullRemoteImage(path: string): Promise<Uint8Array | null> 
         const file = await getGitlabFileContent({ path, ref: gitlabBranch, repo: gitlabRepo })
         if (file && typeof file.content === 'string') {
           const base64Content = file.content.replace(/\n/g, '')
-          return Buffer.from(base64Content, 'base64')
+          return base64ToUint8Array(base64Content)
         }
         break
       }
@@ -537,7 +538,7 @@ export async function pullRemoteImage(path: string): Promise<Uint8Array | null> 
         const file = await getGiteaFileContent({ path, ref: giteaBranch, repo: giteaRepo })
         if (file && typeof file.content === 'string') {
           const base64Content = file.content.replace(/\n/g, '')
-          return Buffer.from(base64Content, 'base64')
+          return base64ToUint8Array(base64Content)
         }
         break
       }

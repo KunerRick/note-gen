@@ -104,5 +104,15 @@ export function decodeBase64ToString(content: unknown) {
     throw new Error('远程文件内容不是有效的 Base64 字符串')
   }
 
-  return Buffer.from(normalized, 'base64').toString('utf-8')
+  // 使用浏览器兼容的 atob 进行解码
+  try {
+    const binary = atob(normalized)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i++) {
+      bytes[i] = binary.charCodeAt(i)
+    }
+    return new TextDecoder('utf-8').decode(bytes)
+  } catch {
+    throw new Error('Base64 解码失败')
+  }
 }

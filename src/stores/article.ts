@@ -1966,21 +1966,40 @@ const useArticleStore = create<NoteState>((set, get) => ({
               set({ fileTree: cacheTree })
             }
 
-            // 异步同步文档引用的图片（懒加载）
+            // 异步同步文档引用的图片（双向同步）
+            // 对于刚从远程拉取的文档，优先从远程下载图片到本地
             if (await hasNetworkConnection()) {
               setTimeout(async () => {
                 try {
+                  console.log(`[ArticleStore] Starting image sync for pulled document: ${actualPath}`)
                   const imagePaths = extractLocalImagePaths(remoteContent)
                   if (imagePaths.length > 0) {
                     console.log(`[ArticleStore] Found ${imagePaths.length} images in remote ${actualPath}, syncing...`)
-                    await syncImagesForDocument(actualPath, remoteContent, (current, total, imagePath) => {
-                      console.log(`[ArticleStore] Syncing image ${current}/${total}: ${imagePath}`)
+                    const syncResult = await syncImagesForDocument(actualPath, remoteContent, (current, total, imagePath, action) => {
+                      console.log(`[ArticleStore] Syncing image ${current}/${total}: ${imagePath} [${action}]`)
                     })
+                    console.log(`[ArticleStore] Image sync completed for pulled document ${actualPath}:`, {
+                      total: syncResult.totalImages,
+                      success: syncResult.successCount,
+                      failed: syncResult.failedCount
+                    })
+
+                    // 通知编辑器刷新以显示新下载的图片
+                    if (syncResult.successCount > 0) {
+                      emitter.emit('images-downloaded', {
+                        documentPath: actualPath,
+                        count: syncResult.successCount
+                      })
+                    }
+                  } else {
+                    console.log(`[ArticleStore] No images found in pulled document ${actualPath}`)
                   }
                 } catch (error) {
                   console.error('[ArticleStore] Failed to sync images:', error)
                 }
               }, 1000)
+            } else {
+              console.log(`[ArticleStore] No network, skipping image sync for pulled document: ${actualPath}`)
             }
           } catch {
             if (get().activeFilePath === actualPath) {
@@ -2032,15 +2051,31 @@ const useArticleStore = create<NoteState>((set, get) => ({
             // 拉取了新内容，更新 currentArticle
             set({ currentArticle: result.content })
             
-            // 异步同步文档引用的图片（懒加载）
+            // 异步同步文档引用的图片（双向同步）
             setTimeout(async () => {
               try {
+                console.log(`[ArticleStore] syncOnOpen: Starting image sync for: ${actualPath}`)
                 const imagePaths = extractLocalImagePaths(result.content!)
                 if (imagePaths.length > 0) {
                   console.log(`[ArticleStore] syncOnOpen: Found ${imagePaths.length} images in ${actualPath}, syncing...`)
-                  await syncImagesForDocument(actualPath, result.content!, (current, total, imagePath) => {
-                    console.log(`[ArticleStore] syncOnOpen: Syncing image ${current}/${total}: ${imagePath}`)
+                  const syncResult = await syncImagesForDocument(actualPath, result.content!, (current, total, imagePath, action) => {
+                    console.log(`[ArticleStore] syncOnOpen: Syncing image ${current}/${total}: ${imagePath} [${action}]`)
                   })
+                  console.log(`[ArticleStore] syncOnOpen: Image sync completed for ${actualPath}:`, {
+                    total: syncResult.totalImages,
+                    success: syncResult.successCount,
+                    failed: syncResult.failedCount
+                  })
+
+                  // 通知编辑器刷新以显示新下载的图片
+                  if (syncResult.successCount > 0) {
+                    emitter.emit('images-downloaded', {
+                      documentPath: actualPath,
+                      count: syncResult.successCount
+                    })
+                  }
+                } else {
+                  console.log(`[ArticleStore] syncOnOpen: No images found in ${actualPath}`)
                 }
               } catch (error) {
                 console.error('[ArticleStore] syncOnOpen: Failed to sync images:', error)

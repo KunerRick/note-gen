@@ -6,6 +6,7 @@ import { getRemoteFileInfo } from './auto-sync'
 import { fetch } from '@tauri-apps/plugin-http'
 import { buildRepoContentPath, buildRepoContentsEndpoint } from './remote-file'
 import type { S3Config, WebDAVConfig } from '@/types/sync'
+import { uint8ArrayToBase64 } from '@/lib/base64-utils'
 
 /**
  * 图片同步模块
@@ -268,7 +269,7 @@ async function uploadBinaryToGitHub(
       // 文件不存在
     }
 
-    const base64Content = Buffer.from(content).toString('base64')
+    const base64Content = uint8ArrayToBase64(content)
 
     const headers = new Headers()
     headers.append('Authorization', `Bearer ${accessToken}`)
@@ -341,7 +342,7 @@ async function uploadBinaryToGitLab(
   const proxy = await getProxyConfig()
 
   try {
-    const base64Content = Buffer.from(content).toString('base64')
+    const base64Content = uint8ArrayToBase64(content)
 
     // 获取 GitLab API 基础 URL
     const baseUrl = await getGitlabApiBaseUrl()
@@ -453,7 +454,7 @@ async function uploadBinaryToGitea(
       // 文件不存在
     }
 
-    const base64Content = Buffer.from(content).toString('base64')
+    const base64Content = uint8ArrayToBase64(content)
 
     const headers = new Headers()
     headers.append('Authorization', `token ${accessToken}`)
@@ -523,7 +524,7 @@ async function uploadBinaryToS3(
     const { s3Upload } = await import('./s3')
 
     // S3 需要字符串内容，将 Uint8Array 转换为 base64 字符串
-    const base64Content = Buffer.from(content).toString('base64')
+    const base64Content = uint8ArrayToBase64(content)
 
     const result = await s3Upload(s3Config, remotePath, base64Content, proxy)
 
@@ -563,7 +564,7 @@ async function uploadBinaryToWebDAV(
     const { webdavUpload } = await import('./webdav')
 
     // WebDAV 需要字符串内容
-    const base64Content = Buffer.from(content).toString('base64')
+    const base64Content = uint8ArrayToBase64(content)
 
     const result = await webdavUpload(webdavConfig, remotePath, base64Content, proxy)
 
@@ -621,7 +622,7 @@ async function uploadBinaryToGitee(
     }
 
     // 使用 Buffer 进行 Base64 编码（与 gitee.ts 一致）
-    const base64Content = Buffer.from(content).toString('base64')
+    const base64Content = uint8ArrayToBase64(content)
 
     const headers = new Headers()
     headers.append('Content-Type', 'application/json')

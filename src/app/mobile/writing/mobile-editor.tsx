@@ -7,7 +7,7 @@ import type { Editor } from '@tiptap/react'
 import { Loader2 } from 'lucide-react'
 import useArticleStore from '@/stores/article'
 import emitter from '@/lib/emitter'
-import { exists, readTextFile, writeTextFile } from '@tauri-apps/plugin-fs'
+import { writeTextFile } from '@tauri-apps/plugin-fs'
 import { getFilePathOptions, getWorkspacePath } from '@/lib/workspace'
 
 interface MobileEditorProps {
@@ -16,10 +16,9 @@ interface MobileEditorProps {
 
 export function MobileEditor({ onEditorReady }: MobileEditorProps) {
   const tEditor = useTranslations('editor')
-  const { setCurrentArticle, activeFilePath } = useArticleStore()
+  const { setCurrentArticle, activeFilePath, currentArticle, loading } = useArticleStore()
 
   const [content, setContent] = useState('')
-  const [isLoading, setIsLoading] = useState(false)
   const [isEditorReady, setIsEditorReady] = useState(false)
 
   const activePathRef = useRef<string>('')
@@ -31,49 +30,24 @@ export function MobileEditor({ onEditorReady }: MobileEditorProps) {
   useEffect(() => {
     if (activeFilePath && activeFilePath !== activePathRef.current) {
       activePathRef.current = activeFilePath
-      loadFile(activeFilePath)
+      // 重置内容，等待 store 加载
+      setContent('')
+      contentRef.current = ''
     } else if (!activeFilePath && activePathRef.current) {
       activePathRef.current = ''
       setContent('')
       contentRef.current = ''
-      setIsLoading(false)
       setIsEditorReady(false)
     }
   }, [activeFilePath])
 
-  // 加载文件内容
-  const loadFile = useCallback(async (path: string) => {
-    if (!path) return
-
-    setIsLoading(true)
-    try {
-      const workspace = await getWorkspacePath()
-      const pathOptions = await getFilePathOptions(path)
-      let fileContent = ''
-
-      if (workspace.isCustom) {
-        const fileExists = await exists(pathOptions.path)
-        if (fileExists) {
-          fileContent = await readTextFile(pathOptions.path)
-        }
-      } else {
-        const fileExists = await exists(pathOptions.path, { baseDir: pathOptions.baseDir })
-        if (fileExists) {
-          fileContent = await readTextFile(pathOptions.path, { baseDir: pathOptions.baseDir })
-        }
-      }
-
-      setContent(fileContent)
-      contentRef.current = fileContent
-      setCurrentArticle(fileContent)
-    } catch {
-      setContent('')
-      contentRef.current = ''
-      setCurrentArticle('')
-    } finally {
-      setIsLoading(false)
+  // 监听 store 中的 currentArticle 变化
+  useEffect(() => {
+    if (currentArticle !== contentRef.current) {
+      setContent(currentArticle)
+      contentRef.current = currentArticle
     }
-  }, [setCurrentArticle])
+  }, [currentArticle])
 
   // 保存文件
   const doSave = useCallback(async () => {
@@ -136,7 +110,7 @@ export function MobileEditor({ onEditorReady }: MobileEditorProps) {
   }, [onEditorReady])
 
   // 显示加载状态
-  if (isLoading) {
+  if (loading) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <Loader2 className="size-8 animate-spin text-muted-foreground" />
