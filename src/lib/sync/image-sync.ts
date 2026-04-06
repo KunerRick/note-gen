@@ -1,5 +1,5 @@
 import { Store } from '@tauri-apps/plugin-store'
-import { readFile, stat } from '@tauri-apps/plugin-fs'
+import { readFile, stat, exists } from '@tauri-apps/plugin-fs'
 import { getWorkspacePath, getFilePathOptions } from '@/lib/workspace'
 import { getSyncRepoName } from './repo-utils'
 import { getRemoteFileInfo } from './auto-sync'
@@ -76,6 +76,23 @@ async function updateImageSyncCache(
   }
   await setImageSyncCache(cache)
   console.log(`[ImageSync] Updated sync cache for ${imagePath}: ${remoteSha}`)
+}
+
+/**
+ * 检查本地图片文件是否存在
+ */
+async function isLocalImageExists(imagePath: string): Promise<boolean> {
+  try {
+    const workspace = await getWorkspacePath()
+    const pathOptions = await getFilePathOptions(imagePath)
+
+    return workspace.isCustom
+      ? await exists(pathOptions.path)
+      : await exists(pathOptions.path, { baseDir: pathOptions.baseDir })
+  } catch (error) {
+    console.error(`[ImageSync] Failed to check file existence for ${imagePath}:`, error)
+    return false
+  }
 }
 
 /**
@@ -848,13 +865,20 @@ export async function syncImagesForDocument(
 
 /**
  * 检查图片是否需要上传（基于缓存和远程 SHA 比较）
- * 优化：先检查本地缓存，如果本地文件未修改则直接跳过，避免网络请求
+ * 优化：先检查本地文件是否存在，再检查本地缓存，避免不必要的网络请求
  * @param localPath 本地图片路径
  * @returns 是否需要上传
  */
 export async function isImageNeedUpload(localPath: string): Promise<boolean> {
   const startTime = performance.now()
   try {
+    // 先检查本地文件是否存在
+    const fileExists = await isLocalImageExists(localPath)
+    if (!fileExists) {
+      console.log(`[ImageSync] Local file not found, skip upload: ${localPath} (${(performance.now() - startTime).toFixed(0)}ms)`)
+      return false
+    }
+
     // 获取本地文件信息
     const localInfo = await getLocalImageInfo(localPath)
     if (!localInfo) {
