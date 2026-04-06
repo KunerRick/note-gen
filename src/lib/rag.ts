@@ -517,15 +517,21 @@ export async function processMarkdownFile(
  */
 async function getWorkspaceFiles(): Promise<DirTree[]> {
   const workspace = await getWorkspacePath();
-  
+
   // 递归处理目录的辅助函数
   async function processDirectory(dirPath: string, useCustomPath: boolean): Promise<DirTree[]> {
     let entries: DirEntry[];
-    
-    if (useCustomPath) {
-      entries = await readDir(dirPath);
-    } else {
-      entries = await readDir(dirPath, { baseDir: BaseDirectory.AppData });
+
+    try {
+      if (useCustomPath) {
+        entries = await readDir(dirPath);
+      } else {
+        entries = await readDir(dirPath, { baseDir: BaseDirectory.AppData });
+      }
+    } catch (error) {
+      // 目录不存在或无法读取，返回空数组
+      console.log(`[RAG] Directory not found or not readable: ${dirPath}`, error);
+      return [];
     }
     
     const result: DirTree[] = [];

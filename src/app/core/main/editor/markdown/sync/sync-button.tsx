@@ -107,7 +107,7 @@ export function SyncButton() {
   }, [activeFilePath])
 
   // Generate default commit message
-  const generateCommitMessage = useCallback(async (_content: string): Promise<string> => {
+  const generateCommitMessage = useCallback(async (): Promise<string> => {
     // 使用默认提交信息，不调用 AI
     return '默认提交信息'
   }, [])
@@ -135,7 +135,7 @@ export function SyncButton() {
 
       console.log(`[SyncButton] File read took ${(performance.now() - startTime).toFixed(0)}ms`)
 
-      const commitMessage = await generateCommitMessage(content)
+      const commitMessage = await generateCommitMessage()
       console.log(`[SyncButton] Commit message generated in ${(performance.now() - startTime).toFixed(0)}ms`)
 
       let success = false

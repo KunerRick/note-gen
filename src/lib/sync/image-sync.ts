@@ -1,5 +1,5 @@
 import { Store } from '@tauri-apps/plugin-store'
-import { readFile, stat, exists } from '@tauri-apps/plugin-fs'
+import { readFile, stat, exists, writeFile, mkdir } from '@tauri-apps/plugin-fs'
 import { getWorkspacePath, getFilePathOptions } from '@/lib/workspace'
 import { getSyncRepoName } from './repo-utils'
 import { getRemoteFileInfo } from './auto-sync'
@@ -713,6 +713,93 @@ async function uploadBinaryToGitee(
 // ============== 核心导出函数 ==============
 
 /**
+ * 从远程下载图片到本地
+ * @param remotePath 远程图片路径（相对路径）
+ * @returns 下载结果
+ */
+export async function downloadImageFromRemote(remotePath: string): Promise<ImageSyncResult> {
+  const result: ImageSyncResult = {
+    success: false,
+    path: remotePath,
+    remotePath: remotePath
+  }
+
+  console.log(`[ImageSync] Starting download for: ${remotePath}`)
+
+  try {
+    // 从远程获取图片内容
+    const { pullRemoteImage } = await import('./auto-sync')
+    const content = await pullRemoteImage(remotePath)
+
+    if (!content) {
+      result.error = 'Failed to fetch remote image'
+      console.error(`[ImageSync] Failed to download image: ${remotePath}`)
+      return result
+    }
+
+    console.log(`[ImageSync] Image downloaded, size: ${content.byteLength} bytes`)
+
+    // 确保目录存在
+    const dirPath = remotePath.includes('/') ? remotePath.split('/').slice(0, -1).join('/') : ''
+    if (dirPath) {
+      const workspace = await getWorkspacePath()
+      const pathOptions = await getFilePathOptions(dirPath)
+
+      try {
+        let dirExists = false
+        if (workspace.isCustom) {
+          dirExists = await exists(pathOptions.path)
+        } else {
+          dirExists = await exists(pathOptions.path, { baseDir: pathOptions.baseDir })
+        }
+
+        if (!dirExists) {
+          console.log(`[ImageSync] Creating directory: ${dirPath}`)
+          if (workspace.isCustom) {
+            await mkdir(pathOptions.path, { recursive: true })
+          } else {
+            await mkdir(pathOptions.path, { baseDir: pathOptions.baseDir, recursive: true })
+          }
+        }
+      } catch (error) {
+        console.error(`[ImageSync] Failed to create directory ${dirPath}:`, error)
+      }
+    }
+
+    // 写入本地文件
+    const workspace = await getWorkspacePath()
+    const pathOptions = await getFilePathOptions(remotePath)
+
+    if (workspace.isCustom) {
+      await writeFile(pathOptions.path, content)
+    } else {
+      await writeFile(pathOptions.path, content, { baseDir: pathOptions.baseDir })
+    }
+
+    console.log(`[ImageSync] Image saved to local: ${remotePath}`)
+
+    // 获取文件信息并更新缓存
+    const localInfo = await getLocalImageInfo(remotePath)
+    if (localInfo) {
+      // 获取远程 SHA 用于缓存
+      const { getRemoteFileInfo } = await import('./auto-sync')
+      const remoteInfo = await getRemoteFileInfo(remotePath)
+      if (remoteInfo.sha) {
+        await updateImageSyncCache(remotePath, remoteInfo.sha, localInfo.mtime, localInfo.size)
+      }
+    }
+
+    result.success = true
+    console.log(`[ImageSync] Download success: ${remotePath}`)
+  } catch (error) {
+    result.error = String(error)
+    console.error(`[ImageSync] Error during download:`, error)
+  }
+
+  return result
+}
+
+/**
  * 上传单张本地图片到当前配置的同步平台
  * @param localPath 本地图片相对路径
  * @returns 上传结果
@@ -794,16 +881,16 @@ export async function uploadImageForSync(localPath: string): Promise<ImageSyncRe
 }
 
 /**
- * 同步文档关联的所有本地图片
+ * 同步文档关联的所有本地图片（双向同步）
  * @param docPath 文档路径
  * @param content 文档内容
- * @param onProgress 进度回调 (current, total, imagePath)
+ * @param onProgress 进度回调 (current, total, imagePath, action)
  * @returns 同步结果
  */
 export async function syncImagesForDocument(
   docPath: string,
   content: string,
-  onProgress?: (current: number, total: number, imagePath: string) => void
+  onProgress?: (current: number, total: number, imagePath: string, action: string) => void
 ): Promise<DocumentImageSyncResult> {
   const startTime = performance.now()
   const result: DocumentImageSyncResult = {
@@ -823,39 +910,72 @@ export async function syncImagesForDocument(
     return result
   }
 
-  console.log(`[ImageSync] Found ${imagePaths.length} images in ${docPath}, starting sync...`)
+  console.log(`[ImageSync] Found ${imagePaths.length} images in ${docPath}, starting bidirectional sync...`)
 
-  // 上传每张图片（带 SHA 检查跳过未变化的图片）
+  // 同步每张图片
   for (let i = 0; i < imagePaths.length; i++) {
     const imagePath = imagePaths[i]
     const imgStartTime = performance.now()
 
-    onProgress?.(i + 1, imagePaths.length, imagePath)
+    try {
+      // 决定同步方向
+      const decision = await resolveImageSyncDirection(imagePath)
+      console.log(`[ImageSync] ${imagePath}: ${decision.direction} (${decision.reason})`)
 
-    // 检查图片是否需要上传
-    const needUpload = await isImageNeedUpload(imagePath)
-    if (!needUpload) {
-      console.log(`[ImageSync] Skipping unchanged image: ${imagePath} (${(performance.now() - imgStartTime).toFixed(0)}ms)`)
+      let imageResult: ImageSyncResult
+
+      switch (decision.direction) {
+        case 'download':
+          onProgress?.(i + 1, imagePaths.length, imagePath, 'downloading')
+          imageResult = await downloadImageFromRemote(imagePath)
+          break
+
+        case 'upload':
+          onProgress?.(i + 1, imagePaths.length, imagePath, 'uploading')
+          imageResult = await uploadImageForSync(imagePath)
+          break
+
+        case 'skip':
+          onProgress?.(i + 1, imagePaths.length, imagePath, 'skipped')
+          imageResult = {
+            success: true,
+            path: imagePath,
+            remotePath: imagePath,
+            sha: 'unchanged'
+          }
+          break
+
+        case 'conflict':
+        default:
+          onProgress?.(i + 1, imagePaths.length, imagePath, 'conflict')
+          imageResult = {
+            success: false,
+            path: imagePath,
+            remotePath: imagePath,
+            error: 'Conflict detected, manual resolution needed'
+          }
+          break
+      }
+
+      result.images.push(imageResult)
+
+      if (imageResult.success) {
+        result.successCount++
+      } else {
+        result.failedCount++
+      }
+
+      console.log(`[ImageSync] Image ${imagePath} ${decision.direction} in ${(performance.now() - imgStartTime).toFixed(0)}ms`)
+    } catch (error) {
+      console.error(`[ImageSync] Error processing ${imagePath}:`, error)
       result.images.push({
-        success: true,
+        success: false,
         path: imagePath,
         remotePath: imagePath,
-        sha: 'unchanged'
+        error: String(error)
       })
-      result.successCount++
-      continue
-    }
-
-    console.log(`[ImageSync] Uploading image: ${imagePath}...`)
-    const imageResult = await uploadImageForSync(imagePath)
-    result.images.push(imageResult)
-
-    if (imageResult.success) {
-      result.successCount++
-    } else {
       result.failedCount++
     }
-    console.log(`[ImageSync] Image ${imagePath} processed in ${(performance.now() - imgStartTime).toFixed(0)}ms`)
   }
 
   console.log(`[ImageSync] Synced ${result.successCount}/${result.totalImages} images for ${docPath} in ${(performance.now() - startTime).toFixed(0)}ms`)
@@ -915,6 +1035,107 @@ export async function isImageNeedUpload(localPath: string): Promise<boolean> {
     console.error(`[ImageSync] Error checking need upload for ${localPath}:`, error)
     // 出错时默认需要上传
     return true
+  }
+}
+
+/**
+ * 图片同步方向
+ */
+export type ImageSyncDirection = 'upload' | 'download' | 'skip' | 'conflict'
+
+export interface ImageSyncDecision {
+  direction: ImageSyncDirection
+  reason: string
+  localInfo?: { mtime: number; size: number } | null
+  remoteInfo?: { sha?: string; lastModified?: number }
+}
+
+/**
+ * 决定图片同步方向
+ * @param imagePath 图片路径
+ * @returns 同步决策
+ */
+export async function resolveImageSyncDirection(imagePath: string): Promise<ImageSyncDecision> {
+  // 检查本地文件是否存在
+  const localExists = await isLocalImageExists(imagePath)
+  const localInfo = localExists ? await getLocalImageInfo(imagePath) : null
+
+  // 获取远程文件信息
+  const remoteInfo = await getRemoteFileInfo(imagePath)
+  const remoteExists = !!remoteInfo.sha
+
+  // 决策逻辑
+  if (!localExists && !remoteExists) {
+    return {
+      direction: 'skip',
+      reason: 'Neither local nor remote file exists',
+      localInfo,
+      remoteInfo
+    }
+  }
+
+  if (!localExists && remoteExists) {
+    return {
+      direction: 'download',
+      reason: 'Local missing, remote exists',
+      localInfo,
+      remoteInfo
+    }
+  }
+
+  if (localExists && !remoteExists) {
+    return {
+      direction: 'upload',
+      reason: 'Local exists, remote missing',
+      localInfo,
+      remoteInfo
+    }
+  }
+
+  // 两者都存在，需要比较
+  if (localInfo && remoteInfo.lastModified) {
+    // 如果本地文件较新，上传
+    if (localInfo.mtime > remoteInfo.lastModified) {
+      return {
+        direction: 'upload',
+        reason: 'Local file is newer',
+        localInfo,
+        remoteInfo
+      }
+    }
+
+    // 如果远程文件较新，下载
+    if (remoteInfo.lastModified > localInfo.mtime) {
+      return {
+        direction: 'download',
+        reason: 'Remote file is newer',
+        localInfo,
+        remoteInfo
+      }
+    }
+  }
+
+  // 检查缓存，如果本地未修改则跳过
+  const cache = await getImageSyncCache()
+  const cached = cache[imagePath]
+  if (cached && localInfo &&
+      cached.mtime === localInfo.mtime &&
+      cached.size === localInfo.size &&
+      cached.remoteSha === remoteInfo.sha) {
+    return {
+      direction: 'skip',
+      reason: 'File unchanged (cache hit)',
+      localInfo,
+      remoteInfo
+    }
+  }
+
+  // 默认：本地优先（避免覆盖用户数据）
+  return {
+    direction: 'upload',
+    reason: 'Both exist, default to local priority',
+    localInfo,
+    remoteInfo
   }
 }
 

@@ -9,6 +9,7 @@ import { pullRemoteFile, saveLocalFile } from './auto-sync'
 import { shouldExclude } from '@/config/sync-exclusions'
 import emitter from '@/lib/emitter'
 import { join } from '@tauri-apps/api/path'
+import { fetch } from '@tauri-apps/plugin-http'
 
 export interface SyncItem {
   path: string
@@ -113,33 +114,229 @@ async function listFilesRecursively(dirPath: string, useCustom: boolean): Promis
   return files
 }
 
+// ============== 远程文件扫描 ==============
+
+interface RemoteFileInfo {
+  path: string
+  sha: string
+  size: number
+  type: 'file' | 'dir'
+}
+
+/**
+ * 递归扫描 GitHub 远程仓库文件
+ */
+async function scanGitHubRemoteFiles(repo: string, path: string = ''): Promise<RemoteFileInfo[]> {
+  const store = await Store.load('store.json')
+  const accessToken = await store.get<string>('accessToken')
+  const githubUsername = await store.get<string>('githubUsername')
+  const proxy = await getProxyConfig()
+
+  if (!accessToken || !githubUsername) {
+    throw new Error('GitHub credentials not found')
+  }
+
+  const files: RemoteFileInfo[] = []
+
+  try {
+    const headers = new Headers()
+    headers.append('Authorization', `Bearer ${accessToken}`)
+    headers.append('Accept', 'application/vnd.github+json')
+    headers.append('X-GitHub-Api-Version', '2022-11-28')
+
+    const safePath = path.replace(/\s/g, '_')
+    const encodedPath = safePath ? safePath.split('/').map(segment => encodeURIComponent(segment)).join('/') : ''
+    const url = `https://api.github.com/repos/${githubUsername}/${repo}/contents/${encodedPath}?ref=master`
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+      proxy
+    })
+
+    if (response.status === 404) {
+      // 路径不存在，返回空数组
+      return files
+    }
+
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`GitHub API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (!Array.isArray(data)) {
+      // 单个文件
+      if (data.type === 'file') {
+        files.push({
+          path: path,
+          sha: data.sha,
+          size: data.size,
+          type: 'file'
+        })
+      }
+      return files
+    }
+
+    // 目录内容
+    for (const item of data) {
+      if (item.type === 'dir') {
+        // 递归扫描子目录
+        const subFiles = await scanGitHubRemoteFiles(repo, item.path)
+        files.push(...subFiles)
+      } else if (item.type === 'file') {
+        files.push({
+          path: item.path,
+          sha: item.sha,
+          size: item.size,
+          type: 'file'
+        })
+      }
+    }
+  } catch (error) {
+    console.error(`[BatchSync] Error scanning GitHub remote files for ${path}:`, error)
+  }
+
+  return files
+}
+
+/**
+ * 递归扫描 Gitee 远程仓库文件
+ */
+async function scanGiteeRemoteFiles(repo: string, path: string = ''): Promise<RemoteFileInfo[]> {
+  const store = await Store.load('store.json')
+  const accessToken = await store.get<string>('giteeAccessToken')
+  const giteeUsername = await store.get<string>('giteeUsername')
+  const proxy = await getProxyConfig()
+
+  if (!accessToken || !giteeUsername) {
+    throw new Error('Gitee credentials not found')
+  }
+
+  const files: RemoteFileInfo[] = []
+
+  try {
+    const headers = new Headers()
+    headers.append('Content-Type', 'application/json')
+
+    const safePath = path.replace(/\s/g, '_')
+    const encodedPath = safePath ? safePath.split('/').map(segment => encodeURIComponent(segment)).join('/') : ''
+    const url = `https://gitee.com/api/v5/repos/${giteeUsername}/${repo}/contents/${encodedPath}?access_token=${accessToken}&ref=master`
+
+    const response = await fetch(url, {
+      method: 'GET',
+      headers,
+      proxy
+    })
+
+    if (response.status === 404) {
+      return files
+    }
+
+    if (response.status < 200 || response.status >= 300) {
+      throw new Error(`Gitee API error: ${response.status}`)
+    }
+
+    const data = await response.json()
+
+    if (!Array.isArray(data)) {
+      if (data.type === 'file') {
+        files.push({
+          path: path,
+          sha: data.sha,
+          size: data.size || 0,
+          type: 'file'
+        })
+      }
+      return files
+    }
+
+    for (const item of data) {
+      if (item.type === 'dir') {
+        const subFiles = await scanGiteeRemoteFiles(repo, item.path)
+        files.push(...subFiles)
+      } else if (item.type === 'file') {
+        files.push({
+          path: item.path,
+          sha: item.sha,
+          size: item.size || 0,
+          type: 'file'
+        })
+      }
+    }
+  } catch (error) {
+    console.error(`[BatchSync] Error scanning Gitee remote files for ${path}:`, error)
+  }
+
+  return files
+}
+
+/**
+ * 扫描远程仓库所有文件
+ */
+async function scanRemoteFiles(platform: string, repo: string): Promise<RemoteFileInfo[]> {
+  console.log(`[BatchSync] Scanning remote files for ${platform}/${repo}...`)
+
+  let files: RemoteFileInfo[] = []
+
+  switch (platform) {
+    case 'github':
+      files = await scanGitHubRemoteFiles(repo)
+      break
+    case 'gitee':
+      files = await scanGiteeRemoteFiles(repo)
+      break
+    case 'gitlab':
+      // TODO: 实现 GitLab 远程文件扫描
+      console.warn('[BatchSync] GitLab remote file scanning not implemented')
+      break
+    case 'gitea':
+      // TODO: 实现 Gitea 远程文件扫描
+      console.warn('[BatchSync] Gitea remote file scanning not implemented')
+      break
+    case 's3':
+      // TODO: 实现 S3 远程文件扫描
+      console.warn('[BatchSync] S3 remote file scanning not implemented')
+      break
+    case 'webdav':
+      // TODO: 实现 WebDAV 远程文件扫描
+      console.warn('[BatchSync] WebDAV remote file scanning not implemented')
+      break
+    default:
+      throw new Error(`Unsupported platform: ${platform}`)
+  }
+
+  console.log(`[BatchSync] Found ${files.length} remote files`)
+  return files
+}
+
 export async function scanWorkspace(): Promise<SyncItem[]> {
   const items: SyncItem[] = []
   const workspace = await getWorkspacePath()
-  
+
   const dirPath = workspace.isCustom ? workspace.path : 'article'
   const files = await listFilesRecursively(
     dirPath,
     workspace.isCustom
   )
-  
+
   for (const filePath of files) {
     if (shouldExclude(filePath)) continue
-    
+
     const isImage = isImageFile(filePath)
     const isMarkdown = isMarkdownFile(filePath)
-    
+
     if (!isImage && !isMarkdown) continue
-    
+
     const type = isImage ? 'image' : 'document'
-    
+
     try {
       const syncResult = await compareFileVersions(filePath)
-      
+
       items.push({
         path: filePath,
         type,
-        status: syncResult.action === 'none' ? 'synced' : 
+        status: syncResult.action === 'none' ? 'synced' :
                 syncResult.action === 'push' ? 'local_newer' :
                 syncResult.action === 'pull' ? 'remote_newer' :
                 syncResult.action === 'conflict' ? 'conflict' : 'synced'
@@ -152,7 +349,72 @@ export async function scanWorkspace(): Promise<SyncItem[]> {
       })
     }
   }
-  
+
+  return items
+}
+
+/**
+ * 扫描远程仓库并与本地对比，返回需要拉取的文件列表
+ * 用于首次同步或克隆远程仓库
+ */
+export async function scanRemoteWorkspace(): Promise<SyncItem[]> {
+  const items: SyncItem[] = []
+  const platform = await getCurrentPlatform()
+
+  // S3 和 WebDAV 不支持远程扫描
+  if (platform === 's3' || platform === 'webdav') {
+    console.warn(`[BatchSync] Remote scanning not supported for ${platform}`)
+    return items
+  }
+
+  const repo = await getSyncRepoName(platform as any)
+
+  try {
+    // 扫描远程文件
+    const remoteFiles = await scanRemoteFiles(platform, repo)
+
+    for (const remoteFile of remoteFiles) {
+      if (shouldExclude(remoteFile.path)) continue
+
+      const isImage = isImageFile(remoteFile.path)
+      const isMarkdown = isMarkdownFile(remoteFile.path)
+
+      if (!isImage && !isMarkdown) continue
+
+      const type = isImage ? 'image' : 'document'
+
+      // 检查本地是否存在
+      try {
+        const localInfo = await getRemoteFileInfo(remoteFile.path)
+        if (localInfo.sha === remoteFile.sha) {
+          // 本地已存在且 SHA 相同
+          items.push({
+            path: remoteFile.path,
+            type,
+            status: 'synced'
+          })
+        } else {
+          // 本地存在但不同，标记为冲突或远程较新
+          items.push({
+            path: remoteFile.path,
+            type,
+            status: 'remote_newer'
+          })
+        }
+      } catch {
+        // 本地不存在，标记为需要拉取
+        items.push({
+          path: remoteFile.path,
+          type,
+          status: 'remote_newer'
+        })
+      }
+    }
+  } catch (error) {
+    console.error('[BatchSync] Error scanning remote workspace:', error)
+    throw error
+  }
+
   return items
 }
 
@@ -190,14 +452,28 @@ export async function fullSync(options?: {
     totalProcessed: 0,
     errors: []
   }
-  
+
   const onProgress = options?.onProgress
   const onConflict = options?.onConflict
-  
+
   emitter.emit('batch-sync-started', {})
-  
+
   try {
-    const items = await scanWorkspace()
+    // 先扫描本地工作区
+    let items = await scanWorkspace()
+
+    // 如果本地没有文件，尝试扫描远程仓库（首次同步/克隆场景）
+    if (items.length === 0) {
+      console.log('[BatchSync] Local workspace is empty, scanning remote repository...')
+      onProgress?.('scan', 0, 1, 'Scanning remote repository...')
+      try {
+        items = await scanRemoteWorkspace()
+        console.log(`[BatchSync] Found ${items.length} files in remote repository`)
+      } catch (error) {
+        console.error('[BatchSync] Failed to scan remote repository:', error)
+      }
+    }
+
     const pendingPush = items.filter(i => i.status === 'local_newer' || i.status === 'new')
     const pendingPull = items.filter(i => i.status === 'remote_newer')
     const conflictItems = items.filter(i => i.status === 'conflict')

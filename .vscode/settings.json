@@ -7,5 +7,5 @@
     "messages",
     "src/i18n"
   ],
-  "java.configuration.updateBuildConfiguration": "interactive"
+  "java.configuration.updateBuildConfiguration": "automatic"
 }

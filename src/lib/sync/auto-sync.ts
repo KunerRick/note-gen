@@ -490,6 +490,88 @@ export async function pullRemoteFile(path: string): Promise<string> {
 }
 
 /**
+ * 从远程拉取图片文件
+ * @param path 图片路径
+ * @returns 图片内容 Uint8Array，失败返回 null
+ */
+export async function pullRemoteImage(path: string): Promise<Uint8Array | null> {
+  const store = await Store.load('store.json')
+  const primaryBackupMethod = await store.get<string>('primaryBackupMethod') || 'github'
+
+  try {
+    switch (primaryBackupMethod) {
+      case 'github': {
+        const githubRepo = await getSyncRepoName('github')
+        const file = await getGithubFiles({ path, repo: githubRepo })
+        if (file && typeof file.content === 'string') {
+          const base64Content = file.content.replace(/\n/g, '')
+          return Buffer.from(base64Content, 'base64')
+        }
+        break
+      }
+
+      case 'gitee': {
+        const giteeRepo = await getSyncRepoName('gitee')
+        const file = await getGiteeFiles({ path, repo: giteeRepo })
+        if (file && typeof file.content === 'string') {
+          const base64Content = file.content.replace(/\n/g, '')
+          return Buffer.from(base64Content, 'base64')
+        }
+        break
+      }
+
+      case 'gitlab': {
+        const gitlabRepo = await getSyncRepoName('gitlab')
+        const gitlabBranch = await getGitlabBranch()
+        const file = await getGitlabFileContent({ path, ref: gitlabBranch, repo: gitlabRepo })
+        if (file && typeof file.content === 'string') {
+          const base64Content = file.content.replace(/\n/g, '')
+          return Buffer.from(base64Content, 'base64')
+        }
+        break
+      }
+
+      case 'gitea': {
+        const giteaRepo = await getSyncRepoName('gitea')
+        const giteaBranch = await getGiteaBranch()
+        const file = await getGiteaFileContent({ path, ref: giteaBranch, repo: giteaRepo })
+        if (file && typeof file.content === 'string') {
+          const base64Content = file.content.replace(/\n/g, '')
+          return Buffer.from(base64Content, 'base64')
+        }
+        break
+      }
+
+      case 's3': {
+        const s3Config = await store.get<S3Config>('s3SyncConfig')
+        if (s3Config) {
+          const s3File = await s3Download(s3Config, path)
+          if (s3File) {
+            return new TextEncoder().encode(s3File.content)
+          }
+        }
+        break
+      }
+
+      case 'webdav': {
+        const webdavConfig = await store.get<WebDAVConfig>('webdavSyncConfig')
+        if (webdavConfig) {
+          const webdavFile = await webdavDownload(webdavConfig, path)
+          if (webdavFile) {
+            return new TextEncoder().encode(webdavFile.content)
+          }
+        }
+        break
+      }
+    }
+  } catch (error) {
+    console.error(`[AutoSync] Failed to pull remote image ${path}:`, error)
+  }
+
+  return null
+}
+
+/**
  * 确保目录存在，如果不存在则创建
  */
 export async function ensureDirectoryExists(filePath: string): Promise<void> {
