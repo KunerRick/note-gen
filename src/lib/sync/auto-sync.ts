@@ -232,6 +232,34 @@ export async function getRemoteFileInfo(path: string): Promise<{ sha?: string; l
         }
         break
       }
+
+      case 's3': {
+        const s3Config = await store.get<S3Config>('s3SyncConfig')
+        if (s3Config) {
+          const remoteInfo = await s3HeadObject(s3Config, path)
+          if (remoteInfo) {
+            return {
+              sha: remoteInfo.etag,
+              lastModified: remoteInfo.lastModified ? new Date(remoteInfo.lastModified).getTime() : undefined
+            }
+          }
+        }
+        break
+      }
+
+      case 'webdav': {
+        const webdavConfig = await store.get<WebDAVConfig>('webdavSyncConfig')
+        if (webdavConfig) {
+          const remoteInfo = await webdavHeadObject(webdavConfig, path)
+          if (remoteInfo) {
+            return {
+              sha: remoteInfo.etag,
+              lastModified: remoteInfo.lastModified ? new Date(remoteInfo.lastModified).getTime() : undefined
+            }
+          }
+        }
+        break
+      }
     }
   } catch {
     // 静默处理错误

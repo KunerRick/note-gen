@@ -106,27 +106,20 @@ export function SyncButton() {
     }
   }, [activeFilePath])
 
-  // Generate AI commit message
-  const generateCommitMessage = useCallback(async (content: string): Promise<string> => {
-    try {
-      const { fetchAi } = await import('@/lib/ai/chat')
-      const prompt = `请为以下文档内容生成一个简洁的 Git 提交信息（不超过 50 个字符）：
-
-${content.slice(0, 1000)}${content.length > 1000 ? '...' : ''}
-
-直接返回提交信息，不需要任何解释或格式。`
-      const message = await fetchAi(prompt, 'commitModel')
-      return message.trim().slice(0, 50) || `Update ${activeFilePath}`
-    } catch {
-      return `Update ${activeFilePath}`
-    }
-  }, [activeFilePath])
+  // Generate default commit message
+  const generateCommitMessage = useCallback(async (_content: string): Promise<string> => {
+    // 使用默认提交信息，不调用 AI
+    return '默认提交信息'
+  }, [])
 
   // Push to remote
   const handlePush = useCallback(async () => {
     if (!activeFilePath || isLoading) return
 
     setIsLoading(true)
+    const startTime = performance.now()
+    console.log(`[SyncButton] Push started at ${new Date().toISOString()}`)
+
     try {
       const store = await Store.load('store.json')
       const provider = (await store.get<string>('primaryBackupMethod') || 'github') as 'gitee' | 'github' | 'gitlab' | 'gitea' | 's3' | 'webdav'
@@ -140,7 +133,10 @@ ${content.slice(0, 1000)}${content.length > 1000 ? '...' : ''}
         ? await readTextFile(pathOptions.path)
         : await readTextFile(pathOptions.path, { baseDir: pathOptions.baseDir })
 
+      console.log(`[SyncButton] File read took ${(performance.now() - startTime).toFixed(0)}ms`)
+
       const commitMessage = await generateCommitMessage(content)
+      console.log(`[SyncButton] Commit message generated in ${(performance.now() - startTime).toFixed(0)}ms`)
 
       let success = false
 
@@ -234,11 +230,13 @@ ${content.slice(0, 1000)}${content.length > 1000 ? '...' : ''}
         }
       }
 
+      console.log(`[SyncButton] Document upload took ${(performance.now() - startTime).toFixed(0)}ms`)
+
       if (success) {
         // 推送文档成功后，同步关联的图片（仅针对 Markdown 文件）
         const isMarkdown = activeFilePath.endsWith('.md') || activeFilePath.endsWith('.markdown')
         if (isMarkdown) {
-          console.log(`[SyncButton] Starting image sync for ${activeFilePath}`)
+          console.log(`[SyncButton] Starting image sync for ${activeFilePath} at ${(performance.now() - startTime).toFixed(0)}ms`)
           try {
             const imageResult = await syncImagesForDocument(activeFilePath, content)
             console.log(`[SyncButton] Image sync result: ${imageResult.totalImages} images found, ${imageResult.successCount} synced, ${imageResult.failedCount} failed`)
@@ -251,6 +249,14 @@ ${content.slice(0, 1000)}${content.length > 1000 ? '...' : ''}
             })
           } catch (error) {
             console.error(`[SyncButton] Image sync error for ${activeFilePath}:`, error)
+            // 图片同步失败不影响文档同步的成功状态
+            // 仍然发送图片同步完成事件，但标记失败
+            emitter.emit('sync-images-completed', {
+              path: activeFilePath,
+              totalImages: 0,
+              successCount: 0,
+              failedCount: 1
+            })
           }
         }
         emitter.emit('sync-push-completed', { path: activeFilePath, success: true })

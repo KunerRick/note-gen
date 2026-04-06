@@ -5,7 +5,7 @@ import { BaseDirectory, exists, mkdir, remove, rename as fsRename, stat, writeTe
 import { confirm } from '@tauri-apps/plugin-dialog'
 import { useTranslations } from 'next-intl'
 import type { Editor } from '@tiptap/react'
-import { ChevronLeft, FilePlus, Folder, FolderPlus, List, Pencil, Redo2, RefreshCw, Search, SearchCode, Trash2, Undo2, Unplug } from 'lucide-react'
+import { ChevronLeft, FilePlus, Folder, FolderPlus, List, Pencil, Redo2, RefreshCw, Search, SearchCode, Trash2, Undo2, Unplug, RefreshCcw } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import {
@@ -33,6 +33,16 @@ import { getSyncRepoName } from '@/lib/sync/repo-utils'
 import { RepoNames } from '@/lib/sync/github.types'
 import { Store } from '@tauri-apps/plugin-store'
 import { S3Config, WebDAVConfig } from '@/types/sync'
+import { isSyncConfigured } from '@/lib/sync/sync-manager'
+import { fullSync, getSyncStats, SyncStats } from '@/lib/sync/batch-sync'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
+import { Loader2, CheckCircle, XCircle, Upload, Download, Image, AlertCircle } from 'lucide-react'
 
 interface WritingHeaderProps {
   editor: Editor | null
@@ -72,6 +82,21 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
   const [createType, setCreateType] = useState<'file' | 'folder' | null>(null)
   const [createName, setCreateName] = useState('')
   const [creating, setCreating] = useState(false)
+
+  // 全量同步相关状态
+  const [syncConfigured, setSyncConfigured] = useState(false)
+  const [syncSheetOpen, setSyncSheetOpen] = useState(false)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [syncStats, setSyncStats] = useState<SyncStats | null>(null)
+  const [syncPhase, setSyncPhase] = useState('')
+  const [syncProgress, setSyncProgress] = useState({ current: 0, total: 0 })
+  const [syncResult, setSyncResult] = useState<{
+    success: boolean
+    pushedFiles: number
+    pulledFiles: number
+    failedFiles: number
+    errors: string[]
+  } | null>(null)
 
   const [renameTarget, setRenameTarget] = useState<BrowserEntry | null>(null)
   const [renameName, setRenameName] = useState('')
@@ -603,6 +628,69 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
     emitter.emit('editor-search-trigger' as any)
   }, [])
 
+  // 检查同步配置
+  useEffect(() => {
+    isSyncConfigured().then(setSyncConfigured)
+  }, [])
+
+  // 监听同步事件
+  useEffect(() => {
+    const handleBatchSyncStarted = () => {
+      setIsSyncing(true)
+      setSyncResult(null)
+    }
+    const handleBatchSyncCompleted = (res: any) => {
+      setIsSyncing(false)
+      setSyncResult(res)
+    }
+    emitter.on('batch-sync-started', handleBatchSyncStarted)
+    emitter.on('batch-sync-completed', handleBatchSyncCompleted)
+    return () => {
+      emitter.off('batch-sync-started', handleBatchSyncStarted)
+      emitter.off('batch-sync-completed', handleBatchSyncCompleted)
+    }
+  }, [])
+
+  // 加载同步统计
+  const loadSyncStats = async () => {
+    try {
+      const stats = await getSyncStats()
+      setSyncStats(stats)
+    } catch (error) {
+      console.error('Failed to load sync stats:', error)
+    }
+  }
+
+  // 打开同步面板时加载统计
+  useEffect(() => {
+    if (syncSheetOpen && !isSyncing) {
+      loadSyncStats()
+    }
+  }, [syncSheetOpen, isSyncing])
+
+  // 执行全量同步
+  const handleFullSync = async () => {
+    setIsSyncing(true)
+    setSyncResult(null)
+    try {
+      await fullSync({
+        onProgress: (phase, current, total) => {
+          setSyncPhase(phase)
+          setSyncProgress({ current, total })
+        }
+      })
+    } catch (error) {
+      console.error('Batch sync failed:', error)
+      setSyncResult({
+        success: false,
+        pushedFiles: 0,
+        pulledFiles: 0,
+        failedFiles: 0,
+        errors: [String(error)]
+      })
+    }
+  }
+
   return (
     <div className="mobile-page-header w-full flex items-center justify-between gap-3 border-b bg-background px-3 text-sm">
       <div className="flex items-center gap-1 shrink-0">
@@ -629,6 +717,158 @@ export function WritingHeader({ editor }: WritingHeaderProps) {
       </div>
 
       <div className="flex items-center gap-1 shrink-0">
+        {/* 全量同步按钮 */}
+        {syncConfigured && (
+          <Sheet open={syncSheetOpen} onOpenChange={setSyncSheetOpen}>
+            <SheetTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="size-9 rounded-full"
+                aria-label="全量同步"
+              >
+                <RefreshCcw className="size-4" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="bottom" className="h-[70vh] flex flex-col">
+              <SheetHeader>
+                <SheetTitle>全量同步</SheetTitle>
+              </SheetHeader>
+              <div className="flex flex-col h-full pt-4">
+                {!syncResult ? (
+                  <>
+                    {syncStats && (
+                      <div className="grid grid-cols-2 gap-3 mb-4">
+                        <div className="flex items-center gap-2 p-3 bg-blue-50 rounded-lg">
+                          <Upload className="size-5 text-blue-500" />
+                          <div>
+                            <div className="text-blue-500 text-sm font-medium">{syncStats.pendingUpload}</div>
+                            <div className="text-xs text-gray-500">待上传</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 p-3 bg-green-50 rounded-lg">
+                          <Download className="size-5 text-green-500" />
+                          <div>
+                            <div className="text-sm font-medium text-green-500">{syncStats.pendingDownload}</div>
+                            <div className="text-xs text-gray-500">待下载</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 p-3 bg-purple-50 rounded-lg">
+                          <Image className="size-5 text-purple-500" />
+                          <div>
+                            <div className="text-sm font-medium text-purple-500">{syncStats.totalImages}</div>
+                            <div className="text-xs text-gray-500">图片</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2 p-3 bg-orange-50 rounded-lg">
+                          <AlertCircle className="size-5 text-orange-500" />
+                          <div>
+                            <div className="text-sm font-medium text-orange-500">{syncStats.conflicts}</div>
+                            <div className="text-xs text-gray-500">冲突</div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    {isSyncing && (
+                      <div className="flex-1 flex flex-col justify-center">
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-center">
+                            <Loader2 className="size-8 animate-spin text-blue-500" />
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex items-center justify-between text-sm">
+                              <span className="capitalize font-medium">{syncPhase}</span>
+                              <span>{syncProgress.current} / {syncProgress.total}</span>
+                            </div>
+                            <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
+                              <div
+                                className="h-full bg-blue-500 transition-all duration-300"
+                                style={{ width: `${syncProgress.total > 0 ? (syncProgress.current / syncProgress.total) * 100 : 0}%` }}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-auto pt-4">
+                      <Button
+                        className="w-full"
+                        size="lg"
+                        onClick={handleFullSync}
+                        disabled={isSyncing || (syncStats?.pendingUpload ?? 0) === 0}
+                      >
+                        {isSyncing ? (
+                          <>
+                            <Loader2 className="size-5 animate-spin mr-2" />
+                            同步中...
+                          </>
+                        ) : (
+                          <>
+                            <RefreshCcw className="size-5 mr-2" />
+                            开始同步
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  </>
+                ) : (
+                  <div className="flex-1 flex flex-col justify-center">
+                    <div className={`flex flex-col items-center gap-4 ${syncResult.success ? 'text-green-500' : 'text-red-500'}`}>
+                      {syncResult.success ? (
+                        <CheckCircle className="size-12" />
+                      ) : (
+                        <XCircle className="size-12" />
+                      )}
+                      <span className="text-xl font-medium">
+                        {syncResult.success ? '同步完成' : '同步失败'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-3 gap-4 mt-6">
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-blue-500">{syncResult.pushedFiles}</div>
+                        <div className="text-sm text-gray-500">上传</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-green-500">{syncResult.pulledFiles}</div>
+                        <div className="text-sm text-gray-500">下载</div>
+                      </div>
+                      <div className="text-center">
+                        <div className="text-2xl font-bold text-red-500">{syncResult.failedFiles}</div>
+                        <div className="text-sm text-gray-500">失败</div>
+                      </div>
+                    </div>
+
+                    {syncResult.errors.length > 0 && (
+                      <div className="mt-4 p-3 bg-red-50 rounded-lg text-sm text-red-600 max-h-32 overflow-auto">
+                        {syncResult.errors.slice(0, 5).map((error, i) => (
+                          <div key={i} className="truncate">{error}</div>
+                        ))}
+                        {syncResult.errors.length > 5 && (
+                          <div className="mt-1 text-xs">...还有 {syncResult.errors.length - 5} 个错误</div>
+                        )}
+                      </div>
+                    )}
+
+                    <Button
+                      className="w-full mt-6"
+                      variant="outline"
+                      onClick={() => {
+                        setSyncResult(null)
+                        loadSyncStats()
+                      }}
+                    >
+                      再次同步
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </SheetContent>
+          </Sheet>
+        )}
+
         <Button
           variant="ghost"
           size="icon"
